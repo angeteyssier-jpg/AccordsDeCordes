@@ -1,0 +1,1700 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AccordsDeCordes — Manche Graphique</title>
+<meta name="description" content="Visualisez les accords, gammes et modes sur le manche de votre instrument.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎸</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0e0e18;
+  --panel:#13131f;
+  --panel2:#1a1a2c;
+  --border:#2a2a42;
+  --accent:#00d4ff;
+  --accent2:#7c3aed;
+  --wood1:#6b3010;
+  --wood2:#8a4520;
+  --nut:#f5deb3;
+  --str:#c8c8c8;
+  --str-dbl:#e8d080;
+  --text:#e8e8f0;
+  --muted:#6b6b8a;
+  --root:#ff3300;
+  --third:#22cc44;
+  --fifth:#3399ff;
+  --other:#ffd700;
+  --open:#2ecc71;
+  --mute:#e74c3c;
+  --fret:#888;
+  --r:8px;
+  font-family:'Space Grotesk',sans-serif;
+}
+body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;overflow:hidden}
+#app{display:flex;flex-direction:column;height:100vh;height:100dvh;overflow:hidden}
+/* iOS/iPadOS Safari : fix hauteur */
+@supports (-webkit-touch-callout:none){
+  #app{height:-webkit-fill-available}
+  body{height:-webkit-fill-available}
+}
+/* iPad en mode bureau : forcer pleine hauteur */
+@media (pointer:coarse){
+  #app{height:100dvh}
+}
+
+/* HEADER */
+#header{
+  display:flex;align-items:center;gap:16px;
+  padding:10px 20px;
+  background:var(--panel);
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+  flex-wrap:wrap;
+}
+#header h1{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;color:var(--accent);letter-spacing:-1px}
+#header .sub{font-size:12px;color:var(--muted);font-style:italic}
+#play-btn{
+  background:#0a2a0a;border:1px solid #2a6a2a;color:var(--open);
+  font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;
+  padding:7px 16px;border-radius:6px;cursor:pointer;transition:all .2s;
+  touch-action:manipulation;-webkit-tap-highlight-color:transparent;
+}
+button{touch-action:manipulation;}
+#play-btn:hover{background:#142a14;border-color:var(--open)}
+.vol-wrap{display:flex;align-items:center;gap:8px;background:#0d1f0d;border:1px solid #1a3a1a;border-radius:6px;padding:4px 10px}
+.vol-wrap label{font-size:11px;color:#6a9a6a;font-family:'JetBrains Mono',monospace}
+input[type=range]{width:70px;accent-color:var(--open)}
+.timbre-wrap{display:flex;align-items:center;gap:6px}
+.timbre-wrap label{font-size:11px;color:#6a9a6a;font-family:'JetBrains Mono',monospace}
+select{background:#131313;color:var(--text);border:1px solid var(--border);border-radius:5px;padding:4px 8px;font-size:12px;font-family:'JetBrains Mono',monospace;outline:none;cursor:pointer;
+  -webkit-appearance:none;appearance:none;touch-action:manipulation;}
+select:focus{border-color:var(--accent)}
+/* iOS/iPad : taille minimale pour la zone de tap */
+@media (pointer:coarse){
+  select{min-height:36px;padding:6px 10px;font-size:14px;}
+  .section-body{padding:10px 12px;}
+  .ctrl-row{margin-bottom:10px;}
+}
+
+/* MAIN LAYOUT */
+#main{display:flex;flex:1;overflow:hidden;-webkit-flex:1;min-height:0;}
+
+/* SIDEBAR */
+#sidebar{
+  width:230px;min-width:230px;
+  background:var(--panel);
+  border-right:1px solid var(--border);
+  overflow-y:auto;
+  overflow-x:hidden;
+  flex-shrink:0;
+  min-height:0;
+}
+#sidebar::-webkit-scrollbar{width:5px}
+#sidebar::-webkit-scrollbar-track{background:transparent}
+#sidebar::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+.section{border-bottom:1px solid var(--border)}
+.section-hdr{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 12px;cursor:pointer;
+  font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;
+  color:var(--accent);letter-spacing:.05em;
+  user-select:none;
+  -webkit-tap-highlight-color:rgba(0,212,255,0.15);
+  touch-action:manipulation;
+  -webkit-user-select:none;
+  transition:background .15s;
+}
+.section-hdr:hover{background:var(--panel2)}
+.section-hdr .arrow{transition:transform .2s;font-size:9px}
+.section-hdr.closed .arrow{transform:rotate(-90deg)}
+.section-body{padding:8px 10px}
+.section-body.hidden{display:none}
+
+.ctrl-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.ctrl-row label{font-size:11px;color:var(--muted);min-width:60px}
+.ctrl-row select,.ctrl-row input{flex:1;font-size:12px}
+
+.tuning-grid{display:grid;grid-template-columns:auto 1fr;gap:3px 6px;align-items:center}
+.tuning-grid .str-lbl{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);text-align:right}
+.tuning-grid select{width:100%;font-size:10px;padding:2px 4px}
+
+.chord-notes{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.chord-note{
+  padding:3px 8px;border-radius:4px;
+  font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;
+  display:flex;align-items:center;gap:4px;
+}
+.chord-note .role{font-size:9px;opacity:.7;font-weight:400}
+
+.inv-list{display:flex;flex-direction:column;gap:3px;margin-top:4px}
+.inv-btn{
+  display:flex;align-items:center;gap:6px;
+  padding:5px 8px;border-radius:5px;border:1px solid var(--border);
+  cursor:pointer;transition:all .15s;background:transparent;
+  text-align:left;font-family:inherit;
+  touch-action:manipulation;min-height:36px;
+}
+.inv-btn:hover{background:var(--panel2)}
+.inv-btn.active{background:#0d2a0d;border-color:#2a6a2a}
+.inv-btn .inv-name{font-size:10px;font-weight:600;color:var(--muted);flex:1;font-family:'JetBrains Mono',monospace}
+.inv-btn.active .inv-name{color:var(--open)}
+.inv-btn .inv-notes{font-size:9px;color:var(--muted)}
+.inv-play{font-size:9px;color:var(--open);cursor:pointer}
+.inv-btn.active .inv-play{color:var(--open)}
+
+.vis-checks{display:flex;flex-direction:column;gap:4px;margin-top:4px}
+.vis-check{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;font-weight:600;
+  touch-action:manipulation;-webkit-tap-highlight-color:rgba(0,212,255,0.1);min-height:32px;}
+.vis-check input{accent-color:var(--accent);min-width:18px;min-height:18px;}
+
+.color-radios{display:flex;flex-direction:column;gap:3px;margin-top:4px}
+.color-radios label{display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer}
+.color-radios input{accent-color:var(--accent)}
+
+.legend-section{font-size:10px;color:var(--accent);font-family:'JetBrains Mono',monospace;font-weight:700;margin:6px 0 3px;text-transform:uppercase;letter-spacing:.05em}
+.legend-row{display:flex;align-items:center;gap:7px;margin:3px 0}
+.legend-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+.legend-ring{width:12px;height:12px;border-radius:50%;flex-shrink:0;border:2px solid currentColor;background:transparent}
+.legend-x{width:12px;height:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--muted)}
+.legend-txt{font-size:10px;color:var(--muted)}
+
+/* CANVAS AREA */
+#canvas-area{
+  flex:1;
+  -webkit-flex:1;
+  display:flex;
+  -webkit-display:flex;
+  flex-direction:column;
+  -webkit-flex-direction:column;
+  overflow-y:auto;
+  overflow-x:hidden;
+  position:relative;
+  min-height:0;
+  min-width:0;
+  -webkit-overflow-scrolling:touch;
+}
+#canvas-area::-webkit-scrollbar{width:6px}
+#canvas-area::-webkit-scrollbar-track{background:var(--panel)}
+#canvas-area::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+.neck-wrap{
+  flex:none;
+  display:flex;
+  -webkit-display:flex;
+  flex-direction:column;
+  -webkit-flex-direction:column;
+  overflow:hidden;
+  transition:all .2s;
+  min-height:180px;
+  width:100%;
+}
+.neck-scroll{
+  flex:1;
+  -webkit-flex:1;
+  overflow-x:auto;
+  overflow-y:hidden;
+  -webkit-overflow-scrolling:touch;
+  min-height:0;
+}
+.neck-scroll::-webkit-scrollbar{width:0;height:6px}
+.neck-scroll::-webkit-scrollbar-track{background:var(--panel)}
+.neck-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.neck-wrap.hidden{display:none}
+/* iOS : forcer recalcul après unhide */
+.neck-wrap:not(.hidden){display:flex!important;}
+.neck-label{
+  display:flex;align-items:center;gap:8px;
+  padding:4px 12px 0;
+  font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;
+  flex-shrink:0;
+}
+.neck-label.accord{color:var(--accent)}
+.neck-label.gamme{color:#88cc88}
+.neck-label.mode{color:#88aaff}
+canvas{display:block}   /* taille fixe définie par JS */
+
+.divider{height:2px;background:var(--border);flex-shrink:0}
+
+/* STATUS BAR */
+#statusbar{
+  background:var(--panel);
+  border-top:1px solid var(--border);
+  padding:5px 14px;
+  font-family:'JetBrains Mono',monospace;font-size:11px;
+  color:var(--accent);
+  flex-shrink:0;
+}
+
+/* Scrollbar style pour sidebar */
+select option{background:#1a1a2c}
+
+/* ── RESPONSIVE ADAPTATIF ── */
+/* Header compact */
+@media (max-width:900px){
+  #header h1{font-size:16px}
+  #header .sub{display:none}
+  .vol-wrap{padding:3px 6px}
+  input[type=range]{width:50px}
+  #play-btn{font-size:10px;padding:5px 10px}
+}
+@media (max-width:640px){
+  #header{padding:6px 10px;gap:6px}
+  #header h1{font-size:13px}
+  #header .sub{display:none}
+  .timbre-wrap label{display:none}
+  #fullscreen-btn,#arp-dir-btn{display:none}
+  #vis-checks-desktop{display:none}
+  #vis-radio-mobile{display:flex!important}
+}
+
+/* Portrait mobile : sidebar en bandeau */
+@media (max-width:768px) and (orientation:portrait){
+  #app{height:100dvh}
+  #main{flex-direction:column}
+  #sidebar{width:100%;min-width:unset;max-height:180px;border-right:none;border-bottom:1px solid var(--border)}
+  .neck-wrap{min-height:140px}
+}
+
+/* Paysage mobile : sidebar étroite */
+@media (max-width:900px) and (orientation:landscape){
+  #app{height:100dvh}
+  #sidebar{width:160px;min-width:160px;font-size:10px}
+  .section-hdr{font-size:9px;padding:5px 8px}
+  .section-body{padding:4px 6px}
+  select{font-size:10px;padding:2px 4px}
+  .neck-wrap{min-height:130px}
+}
+
+/* Grand écran : sidebar plus large */
+@media (min-width:1400px){
+  #sidebar{width:260px;min-width:260px}
+}
+
+/* Toggle sidebar bouton dans le header (mobile) */
+#sidebar-toggle{
+  display:none;
+  background:var(--panel2);color:var(--accent);
+  border:1px solid var(--border);border-radius:6px;
+  width:34px;height:34px;font-size:16px;cursor:pointer;
+  flex-shrink:0;align-items:center;justify-content:center;
+  -webkit-tap-highlight-color:rgba(0,212,255,0.2);
+  touch-action:manipulation;
+}
+@media (max-width:768px){#sidebar-toggle{display:flex}}
+#sidebar.collapsed{display:none}
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- HEADER -->
+  <div id="header">
+    <h1>AccordsDeCordes</h1>
+    <span class="sub">instruments à cordes</span>
+    <div class="vol-wrap">
+      <span>🔊</span>
+      <input type="range" id="vol" min="0" max="1" step="0.05" value="0.3">
+      <div class="timbre-wrap">
+        <label>Timbre :</label>
+        <select id="timbre-sel"></select>
+      </div>
+    </div>
+    <button id="sidebar-toggle" onclick="toggleSidebar()" title="Menu">☰</button>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:4px;flex-shrink:0">
+      <button id="play-btn" style="margin-left:0">▶  Jouer</button>
+      <button id="arp-dir-btn" title="Direction arpège" onclick="toggleArpDir()" style="background:#1a1a3a;border:1px solid #334;color:#88aaff;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;padding:7px 10px;border-radius:6px;cursor:pointer">Arpège ↑</button>
+      <button id="fullscreen-btn" title="Plein écran" style="background:#1a1a2e;border:1px solid var(--border);color:var(--text);font-size:14px;padding:7px 10px;border-radius:6px;cursor:pointer;transition:all .2s" onclick="toggleFullscreen()">⛶</button>
+    </div>
+  </div>
+
+  <div id="main">
+    <!-- SIDEBAR -->
+    <div id="sidebar">
+
+      <!-- INSTRUMENT -->
+      <div class="section">
+        <div class="section-hdr closed" data-section="inst"><span class="arrow">▼</span> INSTRUMENT</div>
+        <div class="section-body hidden" id="sect-inst">
+          <select id="inst-sel" style="width:100%;margin-bottom:6px"></select>
+          <div class="ctrl-row">
+            <label>Frettes :</label>
+            <select id="frets-sel"></select>
+          </div>
+          <div class="ctrl-row">
+            <label>Capo :</label>
+            <select id="capo-sel"></select>
+          </div>
+        </div>
+      </div>
+
+      <!-- NOTES À VIDE -->
+      <div class="section">
+        <div class="section-hdr closed" data-section="tuning"><span class="arrow">▼</span> NOTES À VIDE</div>
+        <div class="section-body hidden" id="sect-tuning">
+          <div id="tuning-frame" class="tuning-grid"></div>
+        </div>
+      </div>
+
+      <!-- NOTE FONDAMENTALE -->
+      <div class="section">
+        <div class="section-hdr closed" data-section="root"><span class="arrow">▼</span> NOTE FONDAMENTALE</div>
+        <div class="section-body hidden" id="sect-root">
+          <select id="root-sel" style="width:100%"></select>
+        </div>
+      </div>
+
+      <!-- TYPE D'ACCORD -->
+      <div class="section">
+        <div class="section-hdr closed" data-section="ctype"><span class="arrow">▼</span> TYPE D'ACCORD</div>
+        <div class="section-body hidden" id="sect-ctype">
+          <select id="ctype-sel" style="width:100%"></select>
+        </div>
+      </div>
+
+      <!-- GAMME -->
+      <div class="section">
+        <div class="section-hdr closed" data-section="scale"><span class="arrow">▼</span> GAMME</div>
+        <div class="section-body hidden" id="sect-scale">
+          <select id="scale-sel" style="width:100%"></select>
+        </div>
+      </div>
+
+      <!-- MODE -->
+      <div class="section">
+        <div class="section-hdr closed" data-section="mode"><span class="arrow">▼</span> MODE</div>
+        <div class="section-body hidden" id="sect-mode">
+          <select id="mode-sel" style="width:100%"></select>
+        </div>
+      </div>
+
+      <!-- RENVERSEMENTS -->
+      <div class="section">
+        <div class="section-hdr closed" data-section="inv"><span class="arrow">▼</span> RENVERSEMENTS</div>
+        <div class="section-body hidden" id="sect-inv">
+          <div style="font-size:10px;color:var(--muted);font-style:italic;margin-bottom:4px">Cliquer pour appliquer au manche</div>
+          <div id="inv-list" class="inv-list"></div>
+        </div>
+      </div>
+
+      <!-- VISIBILITÉ -->
+      <div class="section">
+        <div class="section-hdr" data-section="vis"><span class="arrow">▼</span> AFFICHER LES MANCHES</div>
+        <div class="section-body" id="sect-vis">
+          <!-- Sur grand écran : checkboxes ; sur mobile : radio (un seul) -->
+          <div class="vis-checks" id="vis-checks-desktop">
+            <label class="vis-check" style="color:var(--accent)"><input type="checkbox" id="show-accord" checked> ● Accord</label>
+            <label class="vis-check" style="color:#88cc88"><input type="checkbox" id="show-gamme"> ● Gamme</label>
+            <label class="vis-check" style="color:#88aaff"><input type="checkbox" id="show-mode"> ● Mode</label>
+          </div>
+          <div id="vis-radio-mobile" style="display:none;flex-direction:column;gap:4px">
+            <label class="vis-check" style="color:var(--accent)"><input type="radio" name="vis-mobile" value="accord" checked> ● Accord</label>
+            <label class="vis-check" style="color:#88cc88"><input type="radio" name="vis-mobile" value="gamme"> ● Gamme</label>
+            <label class="vis-check" style="color:#88aaff"><input type="radio" name="vis-mobile" value="mode"> ● Mode</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- COULEURS -->
+      <div class="section">
+        <div class="section-hdr closed" data-section="colors"><span class="arrow">▼</span> COULEURS GAMME/MODE</div>
+        <div class="section-body hidden" id="sect-colors">
+          <div class="color-radios">
+            <label><input type="radio" name="cmode" value="full" checked> Tous les degrés</label>
+            <label><input type="radio" name="cmode" value="dom135"> Tonique / Tierce / Quinte</label>
+            <label><input type="radio" name="cmode" value="dom"> Tonique seulement</label>
+            <label><input type="radio" name="cmode" value="blanc"> Tout en blanc</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- LÉGENDE -->
+      <div class="section">
+        <div class="section-hdr closed" data-section="legend"><span class="arrow">▼</span> LÉGENDE</div>
+        <div class="section-body hidden" id="sect-legend">
+          <div class="legend-section">Notes de l'accord</div>
+          <div class="legend-row"><div class="legend-dot" style="background:var(--root)"></div><span class="legend-txt">Fondamentale</span></div>
+          <div class="legend-row"><div class="legend-dot" style="background:var(--third)"></div><span class="legend-txt">Tierce</span></div>
+          <div class="legend-row"><div class="legend-dot" style="background:var(--fifth)"></div><span class="legend-txt">Quinte</span></div>
+          <div class="legend-row"><div class="legend-dot" style="background:var(--other)"></div><span class="legend-txt">Extension (7e, 9e…)</span></div>
+          <div class="legend-section">État des cordes</div>
+          <div class="legend-row"><div class="legend-ring" style="color:var(--open)"></div><span class="legend-txt">Corde à vide (accord)</span></div>
+          <div class="legend-row"><div class="legend-dot" style="background:var(--mute);border-radius:2px"></div><span class="legend-txt">Corde muette</span></div>
+          <div class="legend-section">Gammes & Modes</div>
+          <div class="legend-row"><div class="legend-dot" style="background:#FF3300"></div><span class="legend-txt">1 — Tonique</span></div>
+          <div class="legend-row"><div class="legend-dot" style="background:#FF8800"></div><span class="legend-txt">2 — Seconde</span></div>
+          <div class="legend-row"><div class="legend-dot" style="background:#22CC44"></div><span class="legend-txt">3 — Tierce</span></div>
+          <div class="legend-row"><div class="legend-dot" style="background:#00CCCC"></div><span class="legend-txt">4 — Quarte</span></div>
+          <div class="legend-row"><div class="legend-dot" style="background:#3399FF"></div><span class="legend-txt">5 — Quinte</span></div>
+          <div class="legend-row"><div class="legend-dot" style="background:#AA44FF"></div><span class="legend-txt">6 — Sixte</span></div>
+          <div class="legend-row"><div class="legend-dot" style="background:#FFD700"></div><span class="legend-txt">7 — Septième</span></div>
+        </div>
+      </div>
+
+    </div><!-- /sidebar -->
+
+    <!-- CANVAS AREA -->
+    <div id="canvas-area">
+      <div class="neck-wrap" id="wrap-accord">
+        <div class="neck-label accord" style="display:flex;align-items:center;gap:8px">
+          <span>● ACCORD</span>
+          <button onclick="resetChord()" title="Réinitialiser l'accord" style="background:transparent;border:1px solid #334;color:#6688aa;font-family:'JetBrains Mono',monospace;font-size:9px;padding:2px 7px;border-radius:4px;cursor:pointer;line-height:1.4" onmouseover="this.style.borderColor='#00d4ff';this.style.color='#00d4ff'" onmouseout="this.style.borderColor='#334';this.style.color='#6688aa'">↺ reset</button>
+        </div>
+        <div class="neck-scroll" id="scroll-cv-accord"><canvas id="cv-accord"></canvas></div>
+      </div>
+      <div class="divider" id="div1"></div>
+      <div class="neck-wrap" id="wrap-gamme">
+        <div class="neck-label gamme">● GAMME</div>
+        <div class="neck-scroll" id="scroll-cv-gamme"><canvas id="cv-gamme"></canvas></div>
+      </div>
+      <div class="divider" id="div2"></div>
+      <div class="neck-wrap" id="wrap-mode">
+        <div class="neck-label mode">● MODE</div>
+        <div class="neck-scroll" id="scroll-cv-mode"><canvas id="cv-mode"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="statusbar">—</div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// DATA
+// ══════════════════════════════════════════════════════════════════
+const NOTES    = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+const NOTES_FR = {C:"Do","C#":"Do#",D:"Ré","D#":"Ré#",E:"Mi",F:"Fa","F#":"Fa#",G:"Sol","G#":"Sol#",A:"La","A#":"La#",B:"Si"};
+const OCTAVES  = ["0","1","2","3","4","5"];
+const NOTE_OPTIONS = OCTAVES.flatMap(o => NOTES.map(n => n+o));
+
+const CHORD_FORMULAS = {
+  "majeur" : [[0,4,7],        "1 - 3 - 5"],
+  "mineur" : [[0,3,7],        "1 - b3 - 5"],
+  "7"      : [[0,4,7,10],     "1 - 3 - 5 - b7"],
+  "maj7"   : [[0,4,7,11],     "1 - 3 - 5 - 7"],
+  "min7"   : [[0,3,7,10],     "1 - b3 - 5 - b7"],
+  "sus2"   : [[0,2,7],        "1 - 2 - 5"],
+  "sus4"   : [[0,5,7],        "1 - 4 - 5"],
+  "dim"    : [[0,3,6],        "1 - b3 - b5"],
+  "aug"    : [[0,4,8],        "1 - 3 - #5"],
+  "dim7"   : [[0,3,6,9],      "1 - b3 - b5 - bb7"],
+  "min7b5" : [[0,3,6,10],     "1 - b3 - b5 - b7"],
+  "add9"   : [[0,4,7,14],     "1 - 3 - 5 - 9"],
+  "9"      : [[0,4,7,10,14],  "1 - 3 - 5 - b7 - 9"],
+  "6"      : [[0,4,7,9],      "1 - 3 - 5 - 6"],
+  "min6"   : [[0,3,7,9],      "1 - b3 - 5 - 6"],
+  "5"      : [[0,7],          "1 - 5 (power)"],
+  "11"     : [[0,4,7,10,14,17],"1 - 3 - 5 - b7 - 9 - 11"],
+  "min11"  : [[0,3,7,10,14,17],"1 - b3 - 5 - b7 - 9 - 11"],
+  "maj11"  : [[0,4,7,11,14,17],"1 - 3 - 5 - 7 - 9 - 11"],
+  "13"     : [[0,4,7,10,14,17,21],"1-3-5-b7-9-11-13"],
+  "min13"  : [[0,3,7,10,14,17,21],"1-b3-5-b7-9-11-13"],
+  "maj13"  : [[0,4,7,11,14,17,21],"1-3-5-7-9-11-13"],
+};
+
+const SCALES = {
+  "Majeure"              :[0,2,4,5,7,9,11],
+  "Mineure naturelle"    :[0,2,3,5,7,8,10],
+  "Mineure harmonique"   :[0,2,3,5,7,8,11],
+  "Mineure mélodique"    :[0,2,3,5,7,9,11],
+  "Pentatonique majeure" :[0,2,4,7,9],
+  "Pentatonique mineure" :[0,3,5,7,10],
+  "Blues"                :[0,3,5,6,7,10],
+  "Whole tone"           :[0,2,4,6,8,10],
+  "Diminuée (ton-demi)"  :[0,2,3,5,6,8,9,11],
+  "Arabe"                :[0,2,4,5,7,8,11],
+  "Hongroise"            :[0,2,3,6,7,8,11],
+};
+const MODES = {
+  "Ionien (Majeur)"  :[0,2,4,5,7,9,11],
+  "Dorien"           :[0,2,3,5,7,9,10],
+  "Phrygien"         :[0,1,3,5,7,8,10],
+  "Lydien"           :[0,2,4,6,7,9,11],
+  "Mixolydien"       :[0,2,4,5,7,9,10],
+  "Éolien (Mineur)"  :[0,2,3,5,7,8,10],
+  "Locrien"          :[0,1,3,5,6,8,10],
+  "Lydien b7"        :[0,2,4,6,7,9,10],
+  "Phrygien dominant":[0,1,4,5,7,8,10],
+  "Super Locrien"    :[0,1,3,4,6,8,10],
+};
+const DEG_COLORS=["#FF3300","#FF8800","#22CC44","#00CCCC","#3399FF","#AA44FF","#FFD700","#FF88AA"];
+
+const INSTRUMENTS={
+  "Aucun"               :{tuning:[],frets:22},
+  "Guitare 6 cordes"   :{tuning:["E2","A2","D3","G3","B3","E4"],frets:24},
+  "Guitare Alain"      :{tuning:["C2","G2","D3","A3","E4"],frets:24},
+  "Guitare DADGAD"     :{tuning:["D2","A2","D3","G3","A3","D4"],frets:24},
+  "Bouzouki Irlandais" :{tuning:["G3","D4","A4","E5"],frets:24,double:[true,true,true,true]},
+  "Basse 4 cordes"     :{tuning:["E1","A1","D2","G2"],frets:24},
+  "Basse 5 cordes"     :{tuning:["B0","E1","A1","D2","G2"],frets:24},
+  "Basse 6 cordes"     :{tuning:["B0","E1","A1","D2","G2","C3"],frets:24},
+  "Ukulele"            :{tuning:["G4","C4","E4","A4"],frets:24},
+  "Mandoline"          :{tuning:["G3","D4","A4","E5"],frets:24,double:[true,true,true,true]},
+  "Violon"             :{tuning:["G3","D4","A4","E5"],frets:24},
+  "Banjo Tenor 4c"     :{tuning:["C3","G3","D4","A4"],frets:22},
+  "Banjo 5 cordes"     :{tuning:["G4","D3","G3","B3","D4"],frets:22,shortString:true,shortFret:5},
+  "Oud"                :{tuning:["C2","F2","A2","D3","G3","C4"],frets:24,double:[false,true,true,true,true,true]},
+  "Personnalise"       :{tuning:["E2","A2","D3","G3","B3","E4"],frets:24},
+};
+const STR_THICK={
+  "Guitare 6 cordes"   :[4,3.2,2.6,1.8,1.3,0.9],
+  "Guitare Alain"      :[4,3.2,2.6,1.8,1.3],
+  "Guitare DADGAD"     :[4,3.2,2.6,1.8,1.3,0.9],
+  "Bouzouki Irlandais" :[1.2,1.4,1.6,1.2],
+  "Basse 4 cordes"     :[5,4,3,2.2],
+  "Basse 5 cordes"     :[6,5,4,3,2.2],
+  "Basse 6 cordes"     :[6,5,4,3,2.2,1.6],
+  "Ukulele"            :[1.8,1.4,1.2,1.0],
+  "Mandoline"          :[1,1.2,1.5,1],
+  "Violon"             :[2,1.6,1.2,0.9],
+  "Banjo Tenor 4c"     :[2,1.6,1.2,0.9],
+  "Banjo 5 cordes"     :[1,2.2,1.8,1.4,1],
+  "Oud"                :[3,2.5,2,1.6,1.2,1],
+};
+const TIMBRES=["Guitare acier","Guitare nylon","Basse électrique","Basse fretless","Banjo","Mandoline","Ukulele","Oud / Luth","Harpe","Clavecin"];
+
+// ══════════════════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════════════════
+let state={
+  instrument:"Guitare 6 cordes",
+  tuning:["E2","A2","D3","G3","B3","E4"],
+  double:[false,false,false,false,false,false],
+  rootNote:null,
+  ctype:"majeur",
+  scale:null,
+  mode:null,
+  nFrets:22,
+  capo:0,
+  positions:[],
+  cnotes:[],
+  invIndex:0,
+  manualOverrides:{},
+  colorMode:"full",
+  timbre:"Guitare acier",
+  volume:0.3,
+  geo:{}, // saved geometry for click detection
+};
+
+// ══════════════════════════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════════════════════════
+function noteToMidi(s){
+  const n=s.replace(/\d+$/,'');
+  const o=parseInt(s.slice(n.length));
+  return (o+1)*12+NOTES.indexOf(n);
+}
+function midiToFreq(m){return 440*Math.pow(2,(m-69)/12)}
+function noteRole(note,root,ctype){
+  if(!root||!ctype)return'#FFD700';
+  const iv=CHORD_FORMULAS[ctype][0];
+  const ri=NOTES.indexOf(root),ni=NOTES.indexOf(note);
+  const interval=(ni-ri+12)%12;
+  if(interval===0)return'#FF3300';
+  if(iv.length>=2&&iv[1]%12===interval)return'#22CC44';
+  if(iv.length>=3&&iv[2]%12===interval)return'#3399FF';
+  return'#FFD700';
+}
+function buildChord(root,ctype){
+  const ri=NOTES.indexOf(root);
+  return CHORD_FORMULAS[ctype][0].map(i=>NOTES[(ri+i)%12]);
+}
+function isBanjo5(){
+  return !!(INSTRUMENTS[state.instrument]&&INSTRUMENTS[state.instrument].shortString);
+}
+function shortStringFret(){
+  return (INSTRUMENTS[state.instrument]&&INSTRUMENTS[state.instrument].shortFret)||5;
+}
+function getShortInfo(){
+  return isBanjo5()?{0:shortStringFret()}:{};
+}
+function findPositions(tuning,chordNotes,capo){
+  const cs=new Set(chordNotes);
+  const res=[];
+  const isB5fp=isBanjo5();
+  const sfFp=isB5fp?shortStringFret():0;
+  for(let si=0;si<tuning.length;si++){
+    // Corde courte : base SANS capo (elle est indépendante du capo)
+    const om=(isB5fp&&si===0)?noteToMidi(tuning[si]):noteToMidi(tuning[si])+capo;
+    for(let f=0;f<25;f++){
+      const note=NOTES[(om+f)%12];
+      if(cs.has(note)){res.push([si,f,note]);break}
+    }
+  }
+  return res;
+}
+function scaleColor(deg,noteI,rootI){
+  const cm=document.querySelector('input[name=cmode]:checked').value;
+  if(cm==='blanc')return'#ffffff';
+  if(cm==='dom')return noteI===rootI?DEG_COLORS[0]:'#ffffff';
+  if(cm==='dom135')return[0,2,4].includes(deg)?DEG_COLORS[Math.min(deg,DEG_COLORS.length-1)]:'#ffffff';
+  return DEG_COLORS[Math.min(deg,DEG_COLORS.length-1)];
+}
+
+// ══════════════════════════════════════════════════════════════════
+// AUDIO (Karplus-Strong via Web Audio)
+// ══════════════════════════════════════════════════════════════════
+let audioCtx=null;
+function getAudioCtx(){
+  if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  if(audioCtx.state==='suspended')audioCtx.resume();
+  return audioCtx;
+}
+
+function karplus(freq,duration=1.4,timbre='Guitare acier'){
+  const sr=44100;
+  const period=Math.max(2,Math.round(sr/freq));
+  const nSamples=Math.round(sr*duration);
+  let buf=Array.from({length:period},()=>Math.random()*2-1);
+
+  // Smooth by timbre
+  const smooths={
+    'Guitare nylon':8,'Basse électrique':1,'Basse fretless':2,
+    'Banjo':1,'Ukulele':5,'Oud / Luth':4,'Harpe':6,'Clavecin':0,
+  };
+  const sw=smooths[timbre]??3;
+  for(let s=0;s<sw;s++)for(let k=0;k<period;k++)buf[k]=0.5*(buf[k]+buf[(k+1)%period]);
+
+  // Decay
+  const decayMap={
+    'Guitare acier':   [0.9995,0.9992,0.9988,0.9982],
+    'Guitare nylon':   [0.9993,0.9990,0.9985,0.9978],
+    'Basse électrique':[0.9997,0.9995,0.9992,0.9988],
+    'Basse fretless':  [0.9996,0.9993,0.9990,0.9985],
+    'Banjo':           [0.9988,0.9982,0.9975,0.9965],
+    'Mandoline':       [0.9985,0.9978,0.9970,0.9960],
+    'Ukulele':         [0.9990,0.9985,0.9978,0.9968],
+    'Oud / Luth':      [0.9993,0.9989,0.9984,0.9977],
+    'Harpe':           [0.9996,0.9994,0.9991,0.9986],
+    'Clavecin':        [0.9980,0.9972,0.9965,0.9955],
+  };
+  const dk=decayMap[timbre]||[0.9995,0.9992,0.9988,0.9982];
+  const decay=freq<100?dk[0]:freq<200?dk[1]:freq<400?dk[2]:dk[3];
+
+  const out=new Float32Array(nSamples);
+  for(let i=0;i<nSamples;i++){
+    const s=buf[i%period];
+    out[i]=s;
+    buf[i%period]=decay*0.5*(s+buf[(i+1)%period]);
+  }
+  // Fade out
+  const fade=Math.max(1,Math.round(nSamples*0.08));
+  for(let k=0;k<fade;k++)out[nSamples-fade+k]*=(1-k/fade);
+
+  // Gain for bass
+  let gain=1;
+  if(['Basse électrique','Basse fretless'].includes(timbre)){
+    gain=freq<120?2:freq<200?1.6:freq<300?1.2:1;
+  } else{
+    gain=freq<120?1.8:freq<200?1.4:freq<300?1.15:1;
+  }
+  if(gain!==1)for(let i=0;i<out.length;i++)out[i]=Math.max(-1,Math.min(1,out[i]*gain));
+  return out;
+}
+
+function playMidiNotes(midiNotes,arpMs=130){
+  try{
+    const ctx=getAudioCtx();
+    const sr=44100,dur=1.4;
+    const arpSamples=Math.round(arpMs*sr/1000);
+    const total=Math.round(sr*dur)+arpSamples*midiNotes.length;
+    const mix=new Float32Array(total);
+
+    const waves=midiNotes.map((midi,i)=>{
+      const w=karplus(midiToFreq(midi),dur,state.timbre);
+      return{w,offset:i*arpSamples};
+    });
+
+    let peak=0;
+    for(const{w,offset}of waves){
+      for(let i=0;i<w.length;i++){
+        const idx=offset+i;
+        if(idx<total){mix[idx]+=w[i];if(Math.abs(mix[idx])>peak)peak=Math.abs(mix[idx]);}
+      }
+    }
+    if(peak>0.001){const sc=0.88*state.volume/peak;for(let i=0;i<mix.length;i++)mix[i]*=sc;}
+
+    const buf=ctx.createBuffer(1,total,sr);
+    buf.getChannelData(0).set(mix);
+    const src=ctx.createBufferSource();
+    src.buffer=buf;
+    src.connect(ctx.destination);
+    src.start();
+  }catch(e){console.warn('Audio:',e)}
+}
+
+// ══════════════════════════════════════════════════════════════════
+// UI INITIALIZATION
+// ══════════════════════════════════════════════════════════════════
+function initSelects(){
+  // Instruments
+  const instSel=document.getElementById('inst-sel');
+  Object.keys(INSTRUMENTS).forEach(k=>{
+    const o=document.createElement('option');o.value=k;o.textContent=k;instSel.appendChild(o);
+  });
+  instSel.value='Guitare 6 cordes';
+
+  // Frettes
+  const fSel=document.getElementById('frets-sel');
+  for(let i=7;i<=24;i++){const o=document.createElement('option');o.value=i;o.textContent=i;fSel.appendChild(o);}
+  fSel.value=22;
+
+  // Capo
+  const cSel=document.getElementById('capo-sel');
+  for(let i=0;i<=11;i++){const o=document.createElement('option');o.value=i;o.textContent=i===0?'0 (aucun)':i;cSel.appendChild(o);}
+  cSel.value=0;
+
+  // Root
+  const rSel=document.getElementById('root-sel');
+  const ro=document.createElement('option');ro.value='';ro.textContent='— Aucun accord —';rSel.appendChild(ro);
+  NOTES.forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=`${n} (${NOTES_FR[n]})`;rSel.appendChild(o);});
+
+  // Chord type
+  const ctSel=document.getElementById('ctype-sel');
+  Object.keys(CHORD_FORMULAS).forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=k;ctSel.appendChild(o);});
+  ctSel.value='majeur';
+
+  // Scale
+  const scSel=document.getElementById('scale-sel');
+  const so=document.createElement('option');so.value='';so.textContent='— Aucune gamme —';scSel.appendChild(so);
+  Object.keys(SCALES).forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=k;scSel.appendChild(o);});
+
+  // Mode
+  const moSel=document.getElementById('mode-sel');
+  const mo=document.createElement('option');mo.value='';mo.textContent='— Aucun mode —';moSel.appendChild(mo);
+  Object.keys(MODES).forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=k;moSel.appendChild(o);});
+
+  // Timbre
+  const tSel=document.getElementById('timbre-sel');
+  TIMBRES.forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;tSel.appendChild(o);});
+  tSel.value='Guitare acier';
+}
+
+function buildTuningUI(){
+  const frame=document.getElementById('tuning-frame');
+  frame.innerHTML='';
+  if(state.instrument==='Aucun'){
+    frame.innerHTML='<div style="color:var(--muted);font-size:11px;font-style:italic;grid-column:1/-1">— pas d\'instrument —</div>';
+    return;
+  }
+  if(state.instrument==='Personnalise'){
+    const row=document.createElement('div');
+    row.style.cssText='grid-column:1/-1;display:flex;align-items:center;gap:8px;margin-bottom:6px';
+    const lbl2=document.createElement('label');
+    lbl2.textContent='Nb cordes :';
+    lbl2.style.cssText='font-size:10px;color:var(--accent);font-family:JetBrains Mono,monospace;white-space:nowrap';
+    const nbSel=document.createElement('select');
+    nbSel.style.cssText='font-size:11px;padding:2px 4px;width:55px';
+    for(let i=1;i<=12;i++){
+      const o=document.createElement('option');o.value=i;o.textContent=i;
+      if(i===state.tuning.length)o.selected=true;
+      nbSel.appendChild(o);
+    }
+    nbSel.addEventListener('change',()=>{
+      const n=parseInt(nbSel.value);
+      while(state.tuning.length<n){state.tuning.push('E2');state.double.push(false);}
+      state.tuning=state.tuning.slice(0,n);
+      state.double=state.double.slice(0,n);
+      INSTRUMENTS['Personnalise'].tuning=[...state.tuning];
+      buildTuningUI();computeAndDraw();
+    });
+    row.appendChild(lbl2);row.appendChild(nbSel);frame.appendChild(row);
+  }
+  state.tuning.forEach((note,si)=>{
+    const dbl=state.double[si];
+    const lbl=document.createElement('div');
+    lbl.className='str-lbl';
+    lbl.textContent=(si+1)+(dbl?' ×2':'');
+    lbl.style.color=dbl?'var(--str-dbl)':'var(--muted)';
+    frame.appendChild(lbl);
+    const sel=document.createElement('select');
+    NOTE_OPTIONS.forEach(n=>{
+      const o=document.createElement('option');o.value=n;o.textContent=n;
+      if(n===note)o.selected=true;
+      sel.appendChild(o);
+    });
+    sel.addEventListener('change',()=>{
+      state.tuning[si]=sel.value;
+      if(state.instrument==='Personnalise')INSTRUMENTS['Personnalise'].tuning=[...state.tuning];
+      computeAndDraw();
+    });
+    frame.appendChild(sel);
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════
+// COLLAPSIBLE SECTIONS
+// ══════════════════════════════════════════════════════════════════
+document.querySelectorAll('.section-hdr').forEach(hdr=>{
+  // iPad/Safari : role=button + tabindex rendent les div cliquables de façon fiable
+  hdr.setAttribute('role','button');
+  hdr.setAttribute('tabindex','0');
+  function toggleSection(){
+    const id='sect-'+hdr.dataset.section;
+    const body=document.getElementById(id);
+    const isClosed=hdr.classList.contains('closed');
+    hdr.classList.toggle('closed',!isClosed);
+    body.classList.toggle('hidden',!isClosed);
+  }
+  hdr.addEventListener('click',toggleSection);
+  // iOS Safari : les div ne reçoivent pas toujours click sans touchend explicite
+  hdr.addEventListener('touchend',function(e){e.preventDefault();toggleSection();});
+  hdr.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();toggleSection();}});
+});
+
+// ══════════════════════════════════════════════════════════════════
+// CONTROLS EVENT LISTENERS
+// ══════════════════════════════════════════════════════════════════
+document.getElementById('inst-sel').addEventListener('change',e=>{
+  const name=e.target.value;
+  state.instrument=name;
+  if(name==='Aucun'){state.tuning=[];state.double=[];}
+  else{
+    const inst=INSTRUMENTS[name];
+    state.tuning=[...inst.tuning];
+    state.double=inst.double?[...inst.double]:new Array(inst.tuning.length).fill(false);
+    state.nFrets=inst.frets||22;
+    document.getElementById('frets-sel').value=state.nFrets;
+  }
+  buildTuningUI();
+  computeAndDraw();
+});
+document.getElementById('frets-sel').addEventListener('change',e=>{
+  state.nFrets=parseInt(e.target.value);
+  drawAll();
+});
+document.getElementById('capo-sel').addEventListener('change',e=>{
+  state.capo=parseInt(e.target.value);
+  computeAndDraw();
+});
+document.getElementById('root-sel').addEventListener('change',e=>{
+  state.rootNote=e.target.value||null;
+  state.invIndex=0;
+  computeAndDraw();
+});
+document.getElementById('ctype-sel').addEventListener('change',e=>{
+  state.ctype=e.target.value;
+  state.invIndex=0;
+  computeAndDraw();
+});
+document.getElementById('scale-sel').addEventListener('change',e=>{
+  state.scale=e.target.value||null;
+  drawScale();
+});
+document.getElementById('mode-sel').addEventListener('change',e=>{
+  state.mode=e.target.value||null;
+  drawMode();
+});
+document.getElementById('vol').addEventListener('input',e=>{state.volume=parseFloat(e.target.value)});
+document.getElementById('timbre-sel').addEventListener('change',e=>{state.timbre=e.target.value});
+document.getElementById('play-btn').addEventListener('click',playChord);
+document.querySelectorAll('input[name=cmode]').forEach(r=>r.addEventListener('change',()=>{drawScale();drawMode();}));
+
+// Visibility checkboxes
+['accord','gamme','mode'].forEach(t=>{
+  document.getElementById('show-'+t).addEventListener('change',()=>refreshVisibility());
+});
+
+function refreshVisibility(){
+  const a=document.getElementById('show-accord').checked;
+  const g=document.getElementById('show-gamme').checked;
+  const m=document.getElementById('show-mode').checked;
+  document.getElementById('wrap-accord').classList.toggle('hidden',!a);
+  document.getElementById('wrap-gamme').classList.toggle('hidden',!g);
+  document.getElementById('wrap-mode').classList.toggle('hidden',!m);
+  document.getElementById('div1').style.display=(a&&g)?'':'none';
+  document.getElementById('div2').style.display=(g&&m)?'':(!g&&m)?'none':'';
+  drawAll();
+}
+
+// ══════════════════════════════════════════════════════════════════
+// CANVAS CLICK
+// ══════════════════════════════════════════════════════════════════
+document.getElementById('cv-accord').addEventListener('click',e=>onCanvasClick(e,false));
+document.getElementById('cv-accord').addEventListener('contextmenu',e=>{e.preventDefault();onCanvasClick(e,true)});
+// iOS/iPadOS : touch sur canvas accord, gamme, mode
+['cv-accord','cv-gamme','cv-mode'].forEach(id=>{
+  const el=document.getElementById(id);
+  if(!el)return;
+  el.addEventListener('touchend',e=>{
+    e.preventDefault();
+    const touch=e.changedTouches[0];
+    if(id==='cv-accord'){
+      onCanvasClick({clientX:touch.clientX,clientY:touch.clientY,target:e.target},false);
+    }
+  },{passive:false});
+});
+
+// Redessiner quand les canvases changent de taille (ResizeObserver)
+if(typeof ResizeObserver!=='undefined'){
+  const ro=new ResizeObserver(()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>drawAll(),80);});
+  ['scroll-cv-accord','scroll-cv-gamme','scroll-cv-mode'].forEach(id=>{
+    const el=document.getElementById(id);if(el)ro.observe(el);
+  });
+}
+// iOS : redessiner aussi au window load et au visibilitychange
+window.addEventListener('load',()=>setTimeout(()=>{refreshVisibility();drawAll();},200));
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(()=>drawAll(),100);});
+
+function onCanvasClick(e,isRight){
+  const g=state.geo;if(!g.ML)return;
+  const rect=e.target.getBoundingClientRect();
+  const x=e.clientX-rect.left,y=e.clientY-rect.top;
+  const hit=xyToStringFret(x,y,g);
+  if(!hit)return;
+  const[si,fret,zone]=hit;
+  const posMap=Object.fromEntries(state.positions.map(([s,f,n])=>[s,[f,n]]));
+
+  if(zone==='play'&&!isRight){
+    // Tap sur bouton play : jouer la note de cette corde
+    const posMap2=Object.fromEntries(state.positions.map(([s,f,n])=>[s,[f,n]]));
+    if(posMap2[si]){
+      const[f]=posMap2[si];
+      if(f>=0)playMidiNotes([noteToMidi(state.tuning[si])+f],0);
+    }
+    return;
+  } else if(isRight){
+    // Clic droit : toujours effacer l'override → revient à la position calculée
+    delete state.manualOverrides[si];
+  } else if(zone==='open'){
+    // Clic gauche sur zone ouverte (avant le sillet) :
+    // mute ↔ vide ↔ mute (toggle)
+    const over=state.manualOverrides[si];
+    const curFret=posMap[si]?.[0];
+    const isMuted=(over===-1)||(over===undefined&&posMap[si]===undefined);
+    if(isMuted){
+      // Démuetter → remettre à vide (fret 0)
+      state.manualOverrides[si]=0;
+    } else if((over===0)||(over===undefined&&curFret===0)){
+      // Est à vide → muetter
+      state.manualOverrides[si]=-1;
+    } else {
+      // Est sur une frette → mettre à vide
+      state.manualOverrides[si]=0;
+    }
+  } else {
+    // Clic sur le manche (zone frettes)
+    const over=state.manualOverrides[si];
+    const curFret=posMap[si]?.[0];
+    if(over===fret||(curFret===fret&&over===undefined)){
+      // Clic sur la pastille active → muetter
+      state.manualOverrides[si]=-1;
+    } else {
+      state.manualOverrides[si]=fret;
+    }
+  }
+  applyOverridesAndRefresh();
+}
+
+// Zones tactiles avec rayon élargi sur mobile
+// iPad OS 13+ en mode bureau n'a pas 'ontouchstart' mais a des touch points
+const hasTouchScreen = ('ontouchstart' in window)
+  || (navigator.maxTouchPoints>0)
+  || (navigator.msMaxTouchPoints>0);
+const TOUCH_R = hasTouchScreen ? 22 : 12;
+
+function xyToStringFret(x,y,g){
+  const{ML,MT,fw,sg,STR_MARGIN,n_str,n_frets,fb_h,fb_w}=g;
+  if(y<MT-TOUCH_R||y>MT+fb_h+TOUCH_R)return null;
+  let bestSi=null,bestDist=sg*0.6+TOUCH_R*0.5;
+  for(let si=0;si<n_str;si++){
+    const cy=MT+STR_MARGIN+(n_str-1-si)*sg;
+    const d=Math.abs(y-cy);
+    if(d<bestDist){bestDist=d;bestSi=si;}
+  }
+  if(bestSi===null)return null;
+
+  // Zone bouton PLAY (priorité haute) : ML-80 ± TOUCH_R
+  const btnX=g.small?ML-68:ML-80;
+  if(Math.abs(x-btnX)<TOUCH_R){return[bestSi,0,'play'];}
+
+  // Zone MUTE/VIDE : cercle à ML-62 ± TOUCH_R
+  const openX=g.small?ML-52:ML-62;
+  if(Math.abs(x-openX)<TOUCH_R){return[bestSi,0,'open'];}
+
+  // Zone ouverte générale (entre les deux boutons et le sillet)
+  if(x>=ML-94&&x<=ML){return[bestSi,0,'open'];}
+
+  // Zone manche : frettes
+  if(x>ML&&x<=ML+fb_w){
+    const fret=Math.max(1,Math.min(n_frets,Math.floor((x-ML)/fw)+1));
+    return[bestSi,fret,'fret'];
+  }
+  return null;
+}
+
+function applyOverridesAndRefresh(){
+  const base={};
+  state.positions.forEach(([si,f,n])=>base[si]=[f,n]);
+  const newPos=[];
+  for(let si=0;si<state.tuning.length;si++){
+    const over=state.manualOverrides[si];
+    if(over!==undefined){
+      if(over===-1)continue;
+      const note=NOTES[(noteToMidi(state.tuning[si])+over)%12];
+      newPos.push([si,over,note]);
+    } else if(base[si]){
+      newPos.push([si,...base[si]]);
+    }
+  }
+  state.positions=newPos;
+  const notes=[...new Set(newPos.map(([,,n])=>n))];
+  draw();
+}
+
+// ══════════════════════════════════════════════════════════════════
+// COMPUTE & DRAW
+// ══════════════════════════════════════════════════════════════════
+function computeAndDraw(){
+  state.invIndex=0;
+  state.manualOverrides={};
+  if(state.instrument==='Aucun'||!state.tuning.length){
+    state.positions=[];
+    state.cnotes=state.rootNote?buildChord(state.rootNote,state.ctype):[];
+      updateInversions();
+    drawAll();
+    updateStatus();
+    return;
+  }
+  const sfCad=isBanjo5()?shortStringFret():0;
+  if(!state.rootNote){
+    state.cnotes=[];
+    state.positions=state.tuning.map((t,si)=>{
+      // Corde courte : note à vide = G4 + max(0,capo-sf) si capo dépasse l'accroche
+      const noteOffset=(isBanjo5()&&si===0)?Math.max(0,state.capo-sfCad):state.capo;
+      return[si,0,NOTES[(noteToMidi(t)+noteOffset)%12]];
+    });
+  } else {
+    state.cnotes=buildChord(state.rootNote,state.ctype);
+    state.positions=findPositions(state.tuning,state.cnotes,state.capo);
+    // Capo >= sf : corde courte sonne plus haut à vide
+    // Si la nouvelle note à vide n'est pas dans l'accord → la corde est muette
+    if(isBanjo5()&&state.capo>=sfCad){
+      const shortOpenNote=NOTES[(noteToMidi(state.tuning[0])+state.capo-sfCad)%12];
+      const inAccord=state.cnotes.includes(shortOpenNote);
+      state.positions=state.positions.filter(([si,f])=>!(si===0&&f===0));
+      if(inAccord){
+        state.positions=[...state.positions,[0,0,shortOpenNote]];
+        state.positions.sort((a,b)=>a[0]-b[0]);
+      }
+    }
+  }
+  updateInversions();
+  drawAll();
+  updateStatus();
+}
+
+function updateStatus(){
+  const sb=document.getElementById('statusbar');
+  const capoStr=state.capo>0?`  Capo ${state.capo}`:'';
+  const chordStr=state.rootNote?`${NOTES_FR[state.rootNote]||state.rootNote} ${state.ctype.toUpperCase()}`:'— cordes à vide —';
+  const invNames=['','  (1er renvers.)','  (2e renvers.)','  (3e renvers.)'];
+  const invS=state.invIndex===0?'':invNames[state.invIndex]||`  (${state.invIndex}e renvers.)`;
+  sb.textContent=`  ${state.instrument}${capoStr}  |  ${chordStr}${invS}`;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// NOTES PANEL
+// ══════════════════════════════════════════════════════════════════
+function updateNotesPanel(notes){} // section composition supprimée
+
+// ══════════════════════════════════════════════════════════════════
+// INVERSIONS
+// ══════════════════════════════════════════════════════════════════
+function updateInversions(){
+  const list=document.getElementById('inv-list');
+  list.innerHTML='';
+  if(!state.cnotes.length||!state.rootNote){
+    list.innerHTML='<div style="color:var(--muted);font-size:10px;font-style:italic">— aucun accord —</div>';
+    return;
+  }
+  const invNames=['État fondamental','1er renversement','2e renversement','3e renversement'];
+  state.cnotes.forEach((_,i)=>{
+    const inv=state.cnotes.slice(i).concat(state.cnotes.slice(0,i));
+    const name=invNames[i]||`${i}e renvers.`;
+    const isActive=(i===state.invIndex);
+    const btn=document.createElement('button');
+    btn.className='inv-btn'+(isActive?' active':'');
+
+    const notesStr=inv.map(n=>NOTES_FR[n]||n).join(' - ');
+    btn.innerHTML=`<span class="inv-play">▶</span><span class="inv-name">${name}</span><span class="inv-notes">${notesStr}</span>`;
+    btn.querySelector('.inv-play').addEventListener('click',ev=>{ev.stopPropagation();playInversion(inv);});
+    btn.addEventListener('click',()=>applyInversion(i));
+    list.appendChild(btn);
+  });
+}
+
+function applyInversion(invIndex){
+  if(!state.cnotes.length||!state.rootNote||state.instrument==='Aucun')return;
+  state.invIndex=invIndex;
+  const inv=state.cnotes.slice(invIndex).concat(state.cnotes.slice(0,invIndex));
+  const newPositions=[];
+  const usedStrings=new Set();
+  // Bass note on lowest available string
+  const bassNote=inv[0];
+  for(let si=0;si<state.tuning.length;si++){
+    if(usedStrings.has(si))continue;
+    const om=noteToMidi(state.tuning[si]);
+    for(let f=0;f<25;f++){
+      if(NOTES[(om+f)%12]===bassNote){newPositions.push([si,f,bassNote]);usedStrings.add(si);break;}
+    }
+    if(usedStrings.has(si))break;
+  }
+  // Other notes
+  for(const note of inv.slice(1)){
+    for(let si=0;si<state.tuning.length;si++){
+      if(usedStrings.has(si))continue;
+      const om=noteToMidi(state.tuning[si]);
+      for(let f=0;f<25;f++){
+        if(NOTES[(om+f)%12]===note){newPositions.push([si,f,note]);usedStrings.add(si);break;}
+      }
+      if(usedStrings.has(si))break;
+    }
+  }
+  newPositions.sort((a,b)=>a[0]-b[0]);
+  state.positions=newPositions;
+  state.manualOverrides={};
+  updateNotesPanel([...new Set(newPositions.map(([,,n])=>n))]);
+  updateInversions();
+  draw();
+  updateStatus();
+}
+
+function playInversion(inv){
+  if(state.instrument==='Aucun')return;
+  const midi=[];
+  for(const note of inv){
+    for(let si=0;si<state.tuning.length;si++){
+      const om=noteToMidi(state.tuning[si]);
+      for(let f=0;f<25;f++){
+        if(NOTES[(om+f)%12]===note){midi.push(om+f);break;}
+      }
+      if(midi.length===inv.indexOf(note)+1)break;
+    }
+  }
+  if(midi.length)playMidiNotes(midi,70);
+}
+
+// ══ MOBILE : radio sélection manche unique ══
+document.querySelectorAll('input[name=vis-mobile]').forEach(r=>{
+  r.addEventListener('change',()=>{
+    const val=r.value;
+    ['accord','gamme','mode'].forEach(t=>{
+      const chk=document.getElementById('show-'+t);
+      if(chk)chk.checked=(t===val);
+    });
+    refreshVisibility();
+  });
+});
+
+function resetChord(){
+  // Remet note fondamentale à "aucun accord"
+  document.getElementById('root-sel').value='';
+  state.rootNote=null;
+  state.invIndex=0;
+  state.manualOverrides={};
+  computeAndDraw();
+}
+
+let arpDir=1; // 1=montant, -1=descendant
+function toggleArpDir(){
+  arpDir*=-1;
+  document.getElementById('arp-dir-btn').textContent='Arpège '+(arpDir===1?'↑':'↓');
+}
+function playChord(){
+  let midi=state.positions.filter(([,f])=>f>=0).map(([si,f])=>noteToMidi(state.tuning[si])+f);
+  if(arpDir===-1)midi=midi.slice().reverse();
+  if(midi.length)playMidiNotes(midi,80);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// DRAW FUNCTIONS
+// ══════════════════════════════════════════════════════════════════
+const INLAY_SET=new Set([3,5,7,9,12,15,17,19,21,24]);
+
+function drawAll(){draw();drawScale();drawMode();}
+
+function setupCanvas(id){
+  const cv=document.getElementById(id);
+  const scroll=cv.parentElement;
+  const nFrets=state.nFrets||22;
+  const nStr=state.tuning.length||6;
+  const minH=50+nStr*22+20+16;
+  // iOS Safari peut retourner 0 pour clientWidth/Height au premier rendu
+  const rawW=scroll.clientWidth||scroll.offsetWidth||window.innerWidth||600;
+  const rawH=scroll.clientHeight||scroll.offsetHeight||minH;
+  const W=Math.max(rawW, 92+nFrets*32+24);
+  const H=Math.max(rawH, minH);
+  cv.style.width=W+'px';
+  cv.style.height=H+'px';
+  cv.width=Math.round(W*devicePixelRatio);
+  cv.height=Math.round(H*devicePixelRatio);
+  const ctx=cv.getContext('2d');
+  ctx.scale(devicePixelRatio,devicePixelRatio);
+  return{cv,ctx,W,H};
+}
+
+function getFretboardGeometry(W,H,nStr,nFrets,extraMT){
+  const ML=92, MR=24;
+  const MT=(extraMT||0)+(H<200?32:50);
+  const MB=20;
+  const STR_MARGIN=8;
+  const maxFbH=nStr*22+STR_MARGIN*2;
+  const fbH=Math.min(H-MT-MB,maxFbH);
+  const fbW=W-ML-MR;
+  const fw=fbW/nFrets;
+  const sg=(fbH-2*STR_MARGIN)/Math.max(nStr-1,1);
+  return{ML,MR,MT,MB,STR_MARGIN,fbH,fbW,fw,sg,
+    sx:f=>ML+f*fw,
+    sy:si=>MT+STR_MARGIN+(nStr-1-si)*sg,
+    n_str:nStr,n_frets:nFrets,fb_h:fbH,fb_w:fbW,
+    small:false,medium:false
+  };
+}
+
+function drawFretboardBase(ctx,W,H,g,title,capo){
+  const{ML,MT,fbH,fbW,fw,sg,sx,sy,n_str,n_frets,small,medium}=g;
+  const fntFret=small?'6px':'8px';
+  const fntTitle=small?'11px':'14px';
+  // Wood background
+  for(let i=0;i<n_frets;i++){
+    ctx.fillStyle=i%2===0?'#7a3b10':'#8a4520';
+    ctx.fillRect(sx(i),MT,fw,fbH);
+  }
+  // Nut/capo
+  if(capo===0){
+    ctx.fillStyle='#f5deb3';ctx.strokeStyle='#999';ctx.lineWidth=1;
+    ctx.fillRect(ML-11,MT-2,11,fbH+4);ctx.strokeRect(ML-11,MT-2,11,fbH+4);
+  } else {
+    ctx.fillStyle='#555';ctx.strokeStyle='#777';ctx.lineWidth=1;
+    ctx.fillRect(ML-11,MT-2,11,fbH+4);ctx.strokeRect(ML-11,MT-2,11,fbH+4);
+    ctx.fillStyle='#ffcc44';ctx.font='bold 8px JetBrains Mono,monospace';
+    ctx.textAlign='center';ctx.fillText(`C${capo}`,ML-6,MT-6);
+  }
+  // Frets + numbers
+  for(let i=0;i<=n_frets;i++){
+    ctx.strokeStyle='#aaa';ctx.lineWidth=i===0?2.5:0.8;
+    ctx.beginPath();ctx.moveTo(sx(i),MT);ctx.lineTo(sx(i),MT+fbH);ctx.stroke();
+    if(i>0){
+      const real=i+capo;
+      ctx.fillStyle=(i===1&&capo>0)?'#ffcc44':'#666';
+      ctx.font=(i===1&&capo>0)?`bold ${fntFret} JetBrains Mono,monospace`:`${fntFret} JetBrains Mono,monospace`;
+      ctx.textAlign='center';ctx.fillText(real,sx(i-0.5),MT+fbH+13);
+    }
+  }
+  // Inlays
+  for(let i=1;i<=n_frets;i++){
+    const real=i+capo;
+    if(!INLAY_SET.has(real))continue;
+    const ix=sx(i-0.5),iy=MT+fbH/2;
+    const r=Math.min(fw,sg)*0.12;
+    ctx.fillStyle='#4a2a0a';
+    if(real%12===0){
+      ctx.beginPath();ctx.arc(ix,iy-sg*0.35,r,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.arc(ix,iy+sg*0.35,r,0,Math.PI*2);ctx.fill();
+    } else {
+      ctx.beginPath();ctx.arc(ix,iy,r,0,Math.PI*2);ctx.fill();
+    }
+  }
+  // Title
+  if(title){
+    ctx.fillStyle='#00d4ff';ctx.font='bold 14px Space Grotesk,sans-serif';
+    ctx.textAlign='center';ctx.fillText(title,W/2,20);
+  }
+}
+
+function drawStrings(ctx,g,tuning,dbl,thicknesses){
+  const{ML,fbH,fbW,fw,MT,sy,n_str,sx}=g;
+  const isB5=isBanjo5();
+  const sf=isB5?shortStringFret():0;
+  for(let si=0;si<n_str;si++){
+    const y=sy(si);
+    const isDbl=dbl[si];
+    const thick=thicknesses[si]||1;
+    const col=isDbl?'#e8d080':'#c8c8c8';
+    const isShort=isB5&&si===0;
+    // Capo < short_fret : décale visuellement ; capo >= short_fret : part de 0
+    const effStart=isShort?Math.max(0,sf-state.capo):0;
+    const xStart=isShort?sx(effStart):ML;
+    if(isDbl){
+      const gap=Math.max(1.5,thick*0.5);
+      ctx.strokeStyle=col;ctx.lineWidth=Math.max(1,Math.round(thick*0.7));
+      ctx.beginPath();ctx.moveTo(xStart,y-gap);ctx.lineTo(ML+fw*g.n_frets,y-gap);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(xStart,y+gap);ctx.lineTo(ML+fw*g.n_frets,y+gap);ctx.stroke();
+    } else {
+      ctx.strokeStyle=col;ctx.lineWidth=Math.max(1,Math.round(thick));
+      ctx.beginPath();ctx.moveTo(xStart,y);ctx.lineTo(ML+fw*g.n_frets,y);ctx.stroke();
+    }
+    // Pastille d'accroche : seulement si la corde n'est pas sous le capo
+    if(isShort&&effStart>0){
+      ctx.fillStyle='#c8a050';ctx.strokeStyle='#f5deb3';ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.arc(xStart,y,5,0,Math.PI*2);ctx.fill();ctx.stroke();
+    }
+    // Note réelle : G + max(0, capo - short_fret) si capo dépasse l'accroche
+    const realNote=isShort
+      ?NOTES[(noteToMidi(tuning[si])+Math.max(0,state.capo-sf))%12]
+      :NOTES[(noteToMidi(tuning[si])+state.capo)%12];
+    const noteCol=isShort?'#c8a050':isDbl?'#e8d080':'#e8e8f0';
+    const fntStr=g.small?'bold 7px JetBrains Mono,monospace':'bold 9px JetBrains Mono,monospace';
+    ctx.fillStyle=noteCol;ctx.font=fntStr;
+    ctx.textAlign='left';ctx.fillText(NOTES_FR[realNote]||realNote,ML-45,y+3);
+    if(isShort){
+      ctx.fillStyle='#876030';ctx.font=g.small?'6px JetBrains Mono,monospace':'7px JetBrains Mono,monospace';
+      ctx.textAlign='left';ctx.fillText('(5fr)',ML-50,y+12);
+    }
+  }
+}
+
+// ── ACCORD DRAW ──
+function draw(){
+  const _wa=document.getElementById('wrap-accord');
+  if(_wa.classList.contains('hidden')||_wa.closest('.hidden')||_wa.style.display==='none')return;
+  const{cv,ctx,W,H}=setupCanvas('cv-accord');
+  if(W<100||H<50)return;
+  ctx.clearRect(0,0,W,H);
+
+  if(state.instrument==='Aucun'||!state.tuning.length){
+    ctx.fillStyle='#333';ctx.font='italic 14px Space Grotesk,sans-serif';
+    ctx.textAlign='center';ctx.fillText('Sélectionnez un instrument',W/2,H/2);
+    if(state.rootNote){
+      ctx.fillStyle='#00d4ff';ctx.font='bold 20px Space Grotesk,sans-serif';
+      ctx.textAlign='center';
+      ctx.fillText(`${NOTES_FR[state.rootNote]||state.rootNote} ${state.ctype.toUpperCase()}`,W/2,H/2-40);
+    }
+    return;
+  }
+
+  const tuning=state.tuning,dbl=state.double,nStr=tuning.length;
+  const nFrets=state.nFrets,capo=state.capo;
+  const g=getFretboardGeometry(W,H,nStr,nFrets);
+  const{ML,MT,fbH,fbW,fw,sg,sx,sy}=g;
+
+  // Save geo for click detection
+  state.geo={...g,fb_w:fbW,fb_h:fbH};
+
+  const invNames=['','  (1er renvers.)','  (2e renvers.)','  (3e renvers.)'];
+  const invSuffix=state.invIndex===0?'':invNames[state.invIndex]||`  (${state.invIndex}e renvers.)`;
+  const chordLbl=state.rootNote?`${NOTES_FR[state.rootNote]||state.rootNote} ${state.ctype.toUpperCase()}${invSuffix}`:'— cordes à vide —';
+
+  drawFretboardBase(ctx,W,H,g,null,capo);
+
+  // Titre : accord en grand en haut, instrument en blanc en dessous
+  const titleSz=g.small?'bold 10px':'bold 13px';
+  const subSz=g.small?'bold 9px':'bold 12px';
+  ctx.fillStyle='#00d4ff';ctx.font=`${titleSz} Space Grotesk,sans-serif`;
+  ctx.textAlign='center';ctx.fillText(chordLbl,W/2,g.small?12:16);
+  ctx.fillStyle='#ffffff';ctx.font=`${subSz} Space Grotesk,sans-serif`;
+  ctx.textAlign='center';ctx.fillText(state.instrument,W/2,g.small?22:30);
+
+  const thicknesses=STR_THICK[state.instrument]||tuning.map((_,si)=>Math.max(1,3-si*0.4));
+  drawStrings(ctx,g,tuning,dbl,thicknesses);
+
+  // Hint
+  ctx.fillStyle='#333';ctx.font='8px JetBrains Mono,monospace';
+  ctx.textAlign='right';
+  if(!g.small){ctx.fillStyle='#333';ctx.font='8px JetBrains Mono,monospace';ctx.textAlign='right';ctx.fillText('zone ouverte : muter/démuter  |  manche : placer  |  clic droit : réinitialiser',W-g.MR-4,MT-8);}
+
+  const rDotBase=g.small?5:7;
+  const rDot=Math.min(Math.max(fw*0.38,rDotBase),sg*0.38,g.small?12:18);
+  const rSmall=Math.max(g.small?3:5,rDot*0.52);
+  const dotFnt=g.small?'5px JetBrains Mono,monospace':'7px JetBrains Mono,monospace';
+  const dotFntB=g.small?'bold 5px JetBrains Mono,monospace':'bold 7px JetBrains Mono,monospace';
+  const posMap={};state.positions.forEach(([si,f,n])=>posMap[si]=[f,n]);
+  const chordSet=new Set(state.cnotes);
+  const isB5=isBanjo5();
+  const shortFret=isB5?shortStringFret():0;
+  // Corde courte : le capo ne l'affecte que si capo >= shortFret
+  const tuningMidi=tuning.map((t,si)=>(isB5&&si===0)?noteToMidi(t):noteToMidi(t)+capo);
+
+  // Dim secondary chord tones
+  const dimCols={'#FF3300':'#7a1a00','#22CC44':'#0d5520','#3399FF':'#0a3a7a','#FFD700':'#7a6000'};
+  for(let si=0;si<nStr;si++){
+    const y=sy(si);
+    const isShortDim=isB5&&si===0;
+    const voffDim=isShortDim?Math.max(0,shortFret-capo):0;
+    for(let f=0;f<=nFrets-voffDim;f++){
+      if(!isShortDim&&f===0)continue; // cordes normales: pas de fret 0 ici (géré après)
+      const note=NOTES[(tuningMidi[si]+f)%12];
+      if(!chordSet.has(note))continue;
+      if(posMap[si]?.[0]===f)continue;
+      const col=noteRole(note,state.rootNote,state.ctype);
+      const colDim=dimCols[col]||'#555';
+      const xd=f===0?sx(voffDim):sx(f+voffDim-0.5);
+      ctx.strokeStyle=col;ctx.lineWidth=0.8;ctx.fillStyle=colDim;
+      ctx.beginPath();ctx.arc(xd,y,rSmall,0,Math.PI*2);ctx.fill();ctx.stroke();
+      ctx.fillStyle=col;ctx.font='bold 6px JetBrains Mono,monospace';
+      ctx.textAlign='center';ctx.fillText(NOTES_FR[note]||note,xd,y+2);
+    }
+  }
+
+  // Cercle "à vide" cliquable — même taille que bouton play (r=9), à ML-50
+  for(let si=0;si<nStr;si++){
+    const y=sy(si);
+    const isShort=isB5&&si===0;
+    if(isShort)continue;
+    const isMuted=posMap[si]===undefined;
+    const isFretZero=posMap[si]?.[0]===0;
+    const openR=g.small?5:7;
+    const openX=g.small?ML-52:ML-62;
+    // Cercle visible en permanence, coloré selon l'état
+    ctx.fillStyle=isFretZero?'#1a2a1a':isMuted?'#2a1a1a':'rgba(255,255,255,0.04)';
+    ctx.strokeStyle=isFretZero?'#2ecc71':isMuted?'#e74c3c':'rgba(255,255,255,0.25)';
+    ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.arc(openX,y,openR,0,Math.PI*2);ctx.fill();ctx.stroke();
+    // Symbole intérieur
+    if(isMuted){
+      ctx.fillStyle='#e74c3c';ctx.font='bold 9px Arial';
+      ctx.textAlign='center';ctx.fillText('✕',openX,y+3);
+    } else {
+      ctx.strokeStyle=isFretZero?'#2ecc71':'rgba(255,255,255,0.3)';ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.arc(openX,y,5,0,Math.PI*2);ctx.stroke();
+    }
+  }
+
+  // Main dots
+  for(let si=0;si<nStr;si++){
+    const y=sy(si);
+    const isShort=isB5&&si===0;
+    const btnX=g.small?ML-68:ML-80;  // bouton play
+    const btnR=9;
+    const inPos=posMap[si]!==undefined;
+
+    // Play button per string
+    ctx.strokeStyle=inPos?'#2ecc71':'#555';ctx.lineWidth=1;
+    ctx.fillStyle=inPos?'#1a2a1a':'#1a1a1a';
+    ctx.beginPath();ctx.arc(btnX,y,7,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.fillStyle=inPos?'#2ecc71':'#555';ctx.font='7px Arial';
+    ctx.textAlign='center';ctx.fillText('▶',btnX+1,y+2);
+
+    if(!posMap[si]){
+      // Corde muette — croix (×)
+      const cx=ML-62,cy=y,cr=rDot*0.65;
+      ctx.strokeStyle='#e74c3c';ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(cx-cr,cy-cr);ctx.lineTo(cx+cr,cy+cr);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(cx-cr,cy+cr);ctx.lineTo(cx+cr,cy-cr);ctx.stroke();
+      continue;
+    }
+    const[fret,note]=posMap[si];
+    const dotCol=noteRole(note,state.rootNote,state.ctype);
+    const isRoot=dotCol==='#FF3300',isThird=dotCol==='#22CC44',isFifth=dotCol==='#3399FF';
+    // Offset visuel : fret musical → position sur le manche (banjo 5c : +shortFret)
+    const voffM=isShort?Math.max(0,shortFret-capo):0; // offset visuel capo-aware
+
+    if(fret===0&&!isShort){
+      // Corde normale à vide : pastille dans le cercle à vide (ML-50)
+      const r2=rDot*0.65,x2=ML-62;
+      ctx.fillStyle=isRoot?dotCol:(capo>0?dotCol:'');
+      ctx.strokeStyle=isRoot?'#fff':dotCol;ctx.lineWidth=2;
+      ctx.beginPath();ctx.arc(x2,y,r2,0,Math.PI*2);
+      if(capo===0&&!isRoot){ctx.stroke();}else{ctx.fill();ctx.stroke();}
+      ctx.fillStyle=(isRoot||capo>0)?'#fff':dotCol;ctx.font=dotFntB;
+      ctx.textAlign='center';ctx.fillText(NOTES_FR[note]||note,x2,y+2);
+    } else if(fret+voffM<=nFrets){
+      // Position visuelle = fret musical + offset visuel
+      const xd=fret===0?sx(voffM):sx(fret+voffM-0.5);
+      const rd=rDot*(isRoot?1.2:isThird?1.05:1);
+      const ring=isRoot?'#fff':isThird?'#ffdd88':isFifth?'#88aaff':'#333';
+      ctx.fillStyle=dotCol;
+      ctx.beginPath();ctx.arc(xd,y,rd,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle=ring;ctx.lineWidth=isRoot?2:1;
+      ctx.beginPath();ctx.arc(xd,y,rd,0,Math.PI*2);ctx.stroke();
+      ctx.fillStyle=isRoot?'#fff':'#000';
+      ctx.font=isRoot?dotFntB:dotFnt;
+      ctx.textAlign='center';ctx.fillText(NOTES_FR[note]||note,xd,y+2);
+    }
+  }
+}
+
+// ── GAMME / MODE GENERIC DRAW ──
+function drawFretboardGeneric(id,title,intervals,rootNote){
+  const _wg=document.getElementById(id.replace('cv-','wrap-'));
+  if(_wg.classList.contains('hidden')||_wg.closest('.hidden')||_wg.style.display==='none')return;
+  const{cv,ctx,W,H}=setupCanvas(id);
+  ctx.clearRect(0,0,W,H);
+  if(W<100||H<50)return;
+  if(state.instrument==='Aucun'||!state.tuning.length){
+    ctx.fillStyle='#333';ctx.font='italic 12px Space Grotesk,sans-serif';
+    ctx.textAlign='center';ctx.fillText('Sélectionnez un instrument',W/2,H/2);
+    return;
+  }
+  if(!intervals||!rootNote){
+    ctx.fillStyle='#333';ctx.font='italic 12px Space Grotesk,sans-serif';
+    ctx.textAlign='center';
+    ctx.fillText(`Choisissez une note et un ${title}`,W/2,H/2);
+    return;
+  }
+
+  const tuning=state.tuning,dbl=state.double,nStr=tuning.length;
+  const nFrets=state.nFrets,capo=state.capo;
+  const g=getFretboardGeometry(W,H,nStr,nFrets,W<500?6:14);
+  const{ML,MT,fbH,fw,sg,sx,sy}=g;
+  const rootI=NOTES.indexOf(rootNote);
+  const noteSet={};
+  intervals.forEach((iv,idx)=>noteSet[(rootI+iv)%12]=idx);
+
+  drawFretboardBase(ctx,W,H,g,null,capo);
+
+  const lbl=`${NOTES_FR[rootNote]||rootNote} — ${title}${capo>0?`  [Capo ${capo}]`:''}`;
+  const gtSz=g.small?'bold 10px':'bold 13px';
+  const gsSz=g.small?'bold 9px':'bold 12px';
+  ctx.fillStyle='#00d4ff';ctx.font=`${gtSz} Space Grotesk,sans-serif`;
+  ctx.textAlign='center';ctx.fillText(lbl,W/2,g.small?11:16);
+  ctx.fillStyle='#ffffff';ctx.font=`${gsSz} Space Grotesk,sans-serif`;
+  ctx.textAlign='center';ctx.fillText(state.instrument,W/2,g.small?21:30);
+
+  const thicknesses=STR_THICK[state.instrument]||tuning.map((_,si)=>Math.max(1,3-si*0.4));
+  drawStrings(ctx,g,tuning,dbl,thicknesses);
+
+  const rDot=Math.min(Math.max(fw*0.35,g.small?4:6),sg*0.38,g.small?10:16);
+  const dotFnt=g.small?'5px JetBrains Mono,monospace':'6px JetBrains Mono,monospace';
+  const dotFntB=g.small?'bold 5px JetBrains Mono,monospace':'bold 6px JetBrains Mono,monospace';
+  const r2=rDot*0.7;
+  const xOpen=ML-46;
+
+  const isB5generic=isBanjo5();
+  const sfGeneric=isB5generic?shortStringFret():0;
+  // Corde courte : le capo ne l'affecte que si capo >= sfGeneric
+  const tuningMidi=tuning.map((t,si)=>(isB5generic&&si===0)?noteToMidi(t):noteToMidi(t)+capo);
+  for(let si=0;si<nStr;si++){
+    const y=sy(si);
+    const isShortStr=isB5generic&&si===0;
+    const voffG=isShortStr?Math.max(0,sfGeneric-capo):0;
+    // Note réelle corde courte : tient compte si capo dépasse l'accroche
+    const openNI=tuningMidi[si]%12;
+    // Note à vide : dans la marge (cordes normales) ou sur l'accroche (corde courte banjo 5c)
+    if(openNI in noteSet){
+      const deg=noteSet[openNI];
+      const col=scaleColor(deg,openNI,rootI);
+      const isRoot=(openNI===rootI);
+      const isWhite=(col==='#ffffff');
+      const xOp=isShortStr?sx(voffG):xOpen;
+      ctx.fillStyle=col;
+      ctx.beginPath();ctx.arc(xOp,y,r2,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle=isRoot?'#fff':isWhite?'#888':'#222';ctx.lineWidth=1;
+      ctx.beginPath();ctx.arc(xOp,y,r2,0,Math.PI*2);ctx.stroke();
+      const noteLbl=NOTES_FR[NOTES[openNI]]||NOTES[openNI];
+      ctx.fillStyle=isWhite?'#000':isRoot?'#fff':'#000';
+      ctx.font=dotFntB;
+      ctx.textAlign='center';ctx.fillText(noteLbl,xOp,y+2);
+    } else if(!isShortStr){
+      ctx.strokeStyle='#555';ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(xOpen-r2,y-r2);ctx.lineTo(xOpen+r2,y+r2);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(xOpen-r2,y+r2);ctx.lineTo(xOpen+r2,y-r2);ctx.stroke();
+    }
+    // Frettes 1+ : fret musical → position visuelle = sx(f + voffG - 0.5)
+    for(let f=1;f<=nFrets-voffG;f++){
+      const ni=(tuningMidi[si]+f)%12;
+      if(!(ni in noteSet))continue;
+      const deg=noteSet[ni];
+      const col=scaleColor(deg,ni,rootI);
+      const isRoot=(ni===rootI);
+      const isWhite=(col==='#ffffff');
+      const xd=sx(f+voffG-0.5);
+      ctx.fillStyle=col;
+      ctx.beginPath();ctx.arc(xd,y,rDot,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle=isRoot?'#fff':isWhite?'#888':'#222';ctx.lineWidth=1;
+      ctx.beginPath();ctx.arc(xd,y,rDot,0,Math.PI*2);ctx.stroke();
+      const noteLbl=NOTES_FR[NOTES[ni]]||NOTES[ni];
+      ctx.fillStyle=isWhite?'#000':isRoot?'#fff':'#000';
+      ctx.font=dotFntB;
+      ctx.textAlign='center';ctx.fillText(noteLbl,xd,y+2);
+    }
+  }
+}
+
+function drawScale(){
+  const intervals=state.scale?SCALES[state.scale]:null;
+  drawFretboardGeneric('cv-gamme',state.scale||'gamme',intervals,state.rootNote);
+}
+function drawMode(){
+  const intervals=state.mode?MODES[state.mode]:null;
+  drawFretboardGeneric('cv-mode',state.mode||'mode',intervals,state.rootNote);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// RESIZE HANDLER
+// ══════════════════════════════════════════════════════════════════
+let resizeTimer=null;
+window.addEventListener('resize',()=>{
+  clearTimeout(resizeTimer);
+  resizeTimer=setTimeout(()=>drawAll(),80);
+});
+
+// ══════════════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════════════
+initSelects();
+
+// ── Préselections à l'ouverture ──
+// Instrument : Guitare 6 cordes
+document.getElementById('inst-sel').value='Guitare 6 cordes';
+const instDef=INSTRUMENTS['Guitare 6 cordes'];
+state.tuning=[...instDef.tuning];
+state.double=new Array(instDef.tuning.length).fill(false);
+state.nFrets=22;
+state.instrument='Guitare 6 cordes';
+buildTuningUI();
+
+// Note fondamentale : C (Do)
+document.getElementById('root-sel').value='C';
+state.rootNote='C';
+
+// Gamme : Majeure
+document.getElementById('scale-sel').value='Majeure';
+state.scale='Majeure';
+
+// Mode : Ionien (Majeur)
+document.getElementById('mode-sel').value='Ionien (Majeur)';
+state.mode='Ionien (Majeur)';
+
+// Canvases sized after layout
+// iOS Safari a besoin de plus de temps pour que le layout soit stable
+// Détection iOS/iPadOS fiable (iPad OS 13+ se présente comme Macintosh en mode bureau)
+const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent)
+  || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+const iosDelay = isIOS ? 400 : 100;
+setTimeout(()=>{
+  refreshVisibility();   // d'abord rendre les wrappers visibles
+  computeAndDraw();      // puis dessiner
+}, iosDelay);
+// Passes supplémentaires pour iOS/iPad
+if(isIOS){
+  setTimeout(()=>{refreshVisibility();drawAll();}, 800);
+  setTimeout(()=>drawAll(), 1500);
+}
+
+// ══ SIDEBAR TOGGLE ══
+function toggleSidebar(){
+  const sb=document.getElementById('sidebar');
+  const btn=document.getElementById('sidebar-toggle');
+  sb.classList.toggle('collapsed');
+  btn.textContent=sb.classList.contains('collapsed')?'☰':'✕';
+  setTimeout(()=>drawAll(),50);
+}
+
+// ══ FULLSCREEN ══
+function toggleFullscreen(){
+  const el=document.documentElement;
+  if(!document.fullscreenElement){
+    (el.requestFullscreen||el.webkitRequestFullscreen||el.mozRequestFullScreen||el.msRequestFullscreen).call(el);
+    document.getElementById('fullscreen-btn').textContent='✕';
+  } else {
+    (document.exitFullscreen||document.webkitExitFullscreen||document.mozCancelFullScreen||document.msExitFullscreen).call(document);
+    document.getElementById('fullscreen-btn').textContent='⛶';
+  }
+}
+document.addEventListener('fullscreenchange',()=>{
+  const btn=document.getElementById('fullscreen-btn');
+  if(btn)btn.textContent=document.fullscreenElement?'✕':'⛶';
+});
+
+// ══ RESPONSIVE : redessiner au changement d'orientation ══
+window.addEventListener('orientationchange',()=>{setTimeout(()=>{drawAll();},300);});
+screen.orientation&&screen.orientation.addEventListener('change',()=>{setTimeout(()=>{drawAll();},300);});
+
+// play par corde géré dans onCanvasClick via zone 'play'
+</script>
+</body>
+</html>
