@@ -414,10 +414,13 @@ select option{background:#1a1a2c}
         <div class="section-body hidden" id="sect-legend">
           <div class="legend-section">Notes de l'accord</div>
           <div id="legend-chord-notes">
-            <div class="legend-row"><div class="legend-dot" style="background:var(--root)"></div><span class="legend-txt">Fondamentale</span></div>
-            <div class="legend-row"><div class="legend-dot" style="background:var(--third)"></div><span class="legend-txt">Tierce</span></div>
-            <div class="legend-row"><div class="legend-dot" style="background:var(--fifth)"></div><span class="legend-txt">Quinte</span></div>
-            <div class="legend-row"><div class="legend-dot" style="background:var(--other)"></div><span class="legend-txt">Extension (7e, 9e…)</span></div>
+            <div class="legend-row"><div class="legend-dot" style="background:#FF3300"></div><span class="legend-txt">1 — Fondamentale</span></div>
+            <div class="legend-row"><div class="legend-dot" style="background:#FF8800"></div><span class="legend-txt">2e / 9e</span></div>
+            <div class="legend-row"><div class="legend-dot" style="background:#22CC44"></div><span class="legend-txt">3 — Tierce</span></div>
+            <div class="legend-row"><div class="legend-dot" style="background:#00CCCC"></div><span class="legend-txt">4e / 11e</span></div>
+            <div class="legend-row"><div class="legend-dot" style="background:#3399FF"></div><span class="legend-txt">5 — Quinte</span></div>
+            <div class="legend-row"><div class="legend-dot" style="background:#AA44FF"></div><span class="legend-txt">6e / 13e</span></div>
+            <div class="legend-row"><div class="legend-dot" style="background:#FFD700"></div><span class="legend-txt">7e</span></div>
           </div>
           <div class="legend-section">État des cordes</div>
           <div class="legend-row"><div class="legend-ring" style="color:var(--open)"></div><span class="legend-txt">Corde à vide (accord)</span></div>
@@ -480,68 +483,70 @@ const OCTAVES  = ["0","1","2","3","4","5"];
 const NOTE_OPTIONS = OCTAVES.flatMap(o => NOTES.map(n => n+o));
 
 const CHORD_FORMULAS = {
+  // ── Triades de base ──
   "majeur" : [[0,4,7],        "1 - 3 - 5"],
   "mineur" : [[0,3,7],        "1 - b3 - 5"],
-  "7"      : [[0,4,7,10],     "1 - 3 - 5 - b7"],
-  "maj7"   : [[0,4,7,11],     "1 - 3 - 5 - 7"],
-  "min7"   : [[0,3,7,10],     "1 - b3 - 5 - b7"],
-  "sus2"   : [[0,2,7],        "1 - 2 - 5"],
-  "sus4"   : [[0,5,7],        "1 - 4 - 5"],
-  "dim"    : [[0,3,6],        "1 - b3 - b5"],
-  "aug"    : [[0,4,8],        "1 - 3 - #5"],
-  "dim7"   : [[0,3,6,9],      "1 - b3 - b5 - bb7"],
+  "5" : [[0,7],          "1 - 5 (power)"],
+  "dim" : [[0,3,6],        "1 - b3 - b5"],
+  "aug" : [[0,4,8],        "1 - 3 - #5"],
+  "sus2" : [[0,2,7],        "1 - 2 - 5"],
+  "sus4" : [[0,5,7],        "1 - 4 - 5"],
+  // ── 6e ──
+  "6" : [[0,4,7,9],      "1 - 3 - 5 - 6"],
+  "min6" : [[0,3,7,9],      "1 - b3 - 5 - 6"],
+  "6/9" : [[0,4,7,9,14],      "1 - 3 - 5 - 6 - 9"],
+  "min6/9" : [[0,3,7,9,14],      "1 - b3 - 5 - 6 - 9"],
+  // ── 7e ──
+  "7" : [[0,4,7,10],     "1 - 3 - 5 - b7"],
+  "maj7" : [[0,4,7,11],     "1 - 3 - 5 - 7"],
+  "min7" : [[0,3,7,10],     "1 - b3 - 5 - b7"],
+  "minmaj7" : [[0,3,7,11],        "1 - b3 - 5 - 7"],
+  "dim7" : [[0,3,6,9],      "1 - b3 - b5 - bb7"],
   "min7b5" : [[0,3,6,10],     "1 - b3 - b5 - b7"],
-  "add9"   : [[0,4,7,14],     "1 - 3 - 5 - 9"],
-  "9"      : [[0,4,7,10,14],  "1 - 3 - 5 - b7 - 9"],
-  "6"      : [[0,4,7,9],      "1 - 3 - 5 - 6"],
-  "min6"   : [[0,3,7,9],      "1 - b3 - 5 - 6"],
-  "5"      : [[0,7],          "1 - 5 (power)"],
-  "11"     : [[0,4,7,10,14,17],"1 - 3 - 5 - b7 - 9 - 11"],
-  "min11"  : [[0,3,7,10,14,17],"1 - b3 - 5 - b7 - 9 - 11"],
-  "maj11"  : [[0,4,7,11,14,17],"1 - 3 - 5 - 7 - 9 - 11"],
-  "13"     : [[0,4,7,10,14,17,21],"1-3-5-b7-9-11-13"],
-  "min13"  : [[0,3,7,10,14,17,21],"1-b3-5-b7-9-11-13"],
-  "maj13"  : [[0,4,7,11,14,17,21],"1-3-5-7-9-11-13"],
-  // ── 9e ──
-  "maj9"   : [[0,4,7,11,14],     "1 - 3 - 5 - 7 - 9"],
-  "min9"   : [[0,3,7,10,14],     "1 - b3 - 5 - b7 - 9"],
-  "minmaj7": [[0,3,7,11],        "1 - b3 - 5 - 7"],
-  "minmaj9": [[0,3,7,11,14],     "1 - b3 - 5 - 7 - 9"],
-  // ── Altérés jazz ──
-  "7b9"    : [[0,4,7,10,13],     "1 - 3 - 5 - b7 - b9"],
-  "7#9"    : [[0,4,7,10,15],     "1 - 3 - 5 - b7 - #9"],
-  "7b5"    : [[0,4,6,10],        "1 - 3 - b5 - b7"],
-  "7#5"    : [[0,4,8,10],        "1 - 3 - #5 - b7"],
-  "7#11"   : [[0,4,7,10,18],     "1 - 3 - 5 - b7 - #11"],
-  "7alt"   : [[0,4,8,10,13,15],  "1 - 3 - #5 - b7 - b9 - #9"],
-  "7b9b5"  : [[0,4,6,10,13],     "1 - 3 - b5 - b7 - b9"],
-  "7b9#5"  : [[0,4,8,10,13],     "1 - 3 - #5 - b7 - b9"],
-  "7#9#5"  : [[0,4,8,10,15],     "1 - 3 - #5 - b7 - #9"],
-  "7#9b5"  : [[0,4,6,10,15],     "1 - 3 - b5 - b7 - #9"],
+  "7b5" : [[0,4,6,10],        "1 - 3 - b5 - b7"],
+  "7#5" : [[0,4,8,10],        "1 - 3 - #5 - b7"],
+  "aug7" : [[0,4,8,10],        "1 - 3 - #5 - b7"],
+  "augmaj7" : [[0,4,8,11],        "1 - 3 - #5 - 7"],
+  "7sus4" : [[0,5,7,10],        "1 - 4 - 5 - b7"],
+  // ── 7e altérées ──
+  "7b9" : [[0,4,7,10,13],     "1 - 3 - 5 - b7 - b9"],
+  "7#9" : [[0,4,7,10,15],     "1 - 3 - 5 - b7 - #9"],
+  "7#11" : [[0,4,7,10,18],     "1 - 3 - 5 - b7 - #11"],
+  "7b9b5" : [[0,4,6,10,13],     "1 - 3 - b5 - b7 - b9"],
+  "7b9#5" : [[0,4,8,10,13],     "1 - 3 - #5 - b7 - b9"],
+  "7#9b5" : [[0,4,6,10,15],     "1 - 3 - b5 - b7 - #9"],
+  "7#9#5" : [[0,4,8,10,15],     "1 - 3 - #5 - b7 - #9"],
   "7b9#11" : [[0,4,7,10,13,18],  "1 - 3 - 5 - b7 - b9 - #11"],
   "7#9#11" : [[0,4,7,10,15,18],  "1 - 3 - 5 - b7 - #9 - #11"],
-  "9b5"    : [[0,4,6,10,14],     "1 - 3 - b5 - b7 - 9"],
-  "9#5"    : [[0,4,8,10,14],     "1 - 3 - #5 - b7 - 9"],
-  "9#11"   : [[0,4,7,10,14,18],  "1 - 3 - 5 - b7 - 9 - #11"],
-  // ── 6/9 jazz/brésilien ──
-  "6/9"    : [[0,4,7,9,14],      "1 - 3 - 5 - 6 - 9"],
-  "min6/9" : [[0,3,7,9,14],      "1 - b3 - 5 - 6 - 9"],
-  // ── sus extensions ──
-  "7sus4"  : [[0,5,7,10],        "1 - 4 - 5 - b7"],
-  "9sus4"  : [[0,5,7,10,14],     "1 - 4 - 5 - b7 - 9"],
+  "7alt" : [[0,4,8,10,13,15],  "1 - 3 - #5 - b7 - b9 - #9"],
+  // ── add ──
+  "add9" : [[0,4,7,14],     "1 - 3 - 5 - 9"],
+  "madd9" : [[0,3,7,14],        "1 - b3 - 5 - 9"],
+  "add11" : [[0,4,7,17],        "1 - 3 - 5 - 11"],
+  // ── 9e ──
+  "9" : [[0,4,7,10,14],  "1 - 3 - 5 - b7 - 9"],
+  "maj9" : [[0,4,7,11,14],     "1 - 3 - 5 - 7 - 9"],
+  "min9" : [[0,3,7,10,14],     "1 - b3 - 5 - b7 - 9"],
+  "minmaj9" : [[0,3,7,11,14],     "1 - b3 - 5 - 7 - 9"],
+  "9b5" : [[0,4,6,10,14],     "1 - 3 - b5 - b7 - 9"],
+  "9#5" : [[0,4,8,10,14],     "1 - 3 - #5 - b7 - 9"],
+  "9#11" : [[0,4,7,10,14,18],  "1 - 3 - 5 - b7 - 9 - #11"],
+  "9sus4" : [[0,5,7,10,14],     "1 - 4 - 5 - b7 - 9"],
+  "dim9" : [[0,3,6,9,14],      "1 - b3 - b5 - bb7 - 9"],
+  // ── 11e ──
+  "11" : [[0,4,7,10,14,17],"1 - 3 - 5 - b7 - 9 - 11"],
+  "maj11" : [[0,4,7,11,14,17],"1 - 3 - 5 - 7 - 9 - 11"],
+  "min11" : [[0,3,7,10,14,17],"1 - b3 - 5 - b7 - 9 - 11"],
+  // ── 13e ──
+  "13" : [[0,4,7,10,14,17,21],"1-3-5-b7-9-11-13"],
+  "maj13" : [[0,4,7,11,14,17,21],"1-3-5-7-9-11-13"],
+  "min13" : [[0,3,7,10,14,17,21],"1-b3-5-b7-9-11-13"],
+  "13b9" : [[0,4,7,10,13,21],  "1 - 3 - 5 - b7 - b9 - 13"],
+  "13#9" : [[0,4,7,10,15,21],  "1 - 3 - 5 - b7 - #9 - 13"],
+  "13#11" : [[0,4,7,10,14,18,21],"1 - 3 - 5 - b7 - 9 - #11 - 13"],
   "13sus4" : [[0,5,7,10,14,21],  "1 - 4 - 5 - b7 - 9 - 13"],
-  // ── 13e altérées ──
-  "13b9"   : [[0,4,7,10,13,21],  "1 - 3 - 5 - b7 - b9 - 13"],
-  "13#9"   : [[0,4,7,10,15,21],  "1 - 3 - 5 - b7 - #9 - 13"],
-  "13#11"  : [[0,4,7,10,14,18,21],"1 - 3 - 5 - b7 - 9 - #11 - 13"],
-  // ── Augmentés étendus ──
-  "aug7"   : [[0,4,8,10],        "1 - 3 - #5 - b7"],
-  "augmaj7": [[0,4,8,11],        "1 - 3 - #5 - 7"],
-  "dim9"   : [[0,3,6,9,14],      "1 - b3 - b5 - bb7 - 9"],
-  // ── Ajoutés ──
-  "add11"  : [[0,4,7,17],        "1 - 3 - 5 - 11"],
-  "madd9"  : [[0,3,7,14],        "1 - b3 - 5 - 9"],
 };
+
 
 const SCALES = {
   "Majeure"              :[0,2,4,5,7,9,11],
@@ -639,14 +644,15 @@ function noteToMidi(s){
 }
 function midiToFreq(m){return 440*Math.pow(2,(m-69)/12)}
 function noteRole(note,root,ctype){
-  if(!root||!ctype)return'#FFD700';
+  // Couleur par degré dans l'accord — même palette que gammes/modes
+  if(!root||!ctype)return DEG_COLORS[6];
   const iv=CHORD_FORMULAS[ctype][0];
   const ri=NOTES.indexOf(root),ni=NOTES.indexOf(note);
   const interval=(ni-ri+12)%12;
-  if(interval===0)return'#FF3300';
-  if(iv.length>=2&&iv[1]%12===interval)return'#22CC44';
-  if(iv.length>=3&&iv[2]%12===interval)return'#3399FF';
-  return'#FFD700';
+  for(let i=0;i<iv.length;i++){
+    if(iv[i]%12===interval)return DEG_COLORS[Math.min(i,DEG_COLORS.length-1)];
+  }
+  return DEG_COLORS[6];
 }
 function buildChord(root,ctype){
   const ri=NOTES.indexOf(root);
@@ -1197,7 +1203,7 @@ function updateChordLegend(){
       <div class="legend-row"><div class="legend-dot" style="background:var(--other)"></div><span class="legend-txt">Extension</span></div>`;
     return;
   }
-  const roleNames=['Fondamentale','Tierce','Quinte','7e / Extension','9e','11e','13e'];
+  const roleNames=['1 — Fondamentale','2e / 9e','3 — Tierce','4e / 11e','5 — Quinte','6e / 13e','7e'];
   const html=state.cnotes.map((note,i)=>{
     const col=noteRole(note,state.rootNote,state.ctype);
     const fr=NOTES_FR[note]||note;
