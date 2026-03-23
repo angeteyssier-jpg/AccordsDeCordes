@@ -413,10 +413,12 @@ select option{background:#1a1a2c}
         <div class="section-hdr closed" data-section="legend"><span class="arrow">▼</span> LÉGENDE</div>
         <div class="section-body hidden" id="sect-legend">
           <div class="legend-section">Notes de l'accord</div>
-          <div class="legend-row"><div class="legend-dot" style="background:var(--root)"></div><span class="legend-txt">Fondamentale</span></div>
-          <div class="legend-row"><div class="legend-dot" style="background:var(--third)"></div><span class="legend-txt">Tierce</span></div>
-          <div class="legend-row"><div class="legend-dot" style="background:var(--fifth)"></div><span class="legend-txt">Quinte</span></div>
-          <div class="legend-row"><div class="legend-dot" style="background:var(--other)"></div><span class="legend-txt">Extension (7e, 9e…)</span></div>
+          <div id="legend-chord-notes">
+            <div class="legend-row"><div class="legend-dot" style="background:var(--root)"></div><span class="legend-txt">Fondamentale</span></div>
+            <div class="legend-row"><div class="legend-dot" style="background:var(--third)"></div><span class="legend-txt">Tierce</span></div>
+            <div class="legend-row"><div class="legend-dot" style="background:var(--fifth)"></div><span class="legend-txt">Quinte</span></div>
+            <div class="legend-row"><div class="legend-dot" style="background:var(--other)"></div><span class="legend-txt">Extension (7e, 9e…)</span></div>
+          </div>
           <div class="legend-section">État des cordes</div>
           <div class="legend-row"><div class="legend-ring" style="color:var(--open)"></div><span class="legend-txt">Corde à vide (accord)</span></div>
           <div class="legend-row"><div class="legend-dot" style="background:var(--mute);border-radius:2px"></div><span class="legend-txt">Corde muette</span></div>
@@ -436,9 +438,19 @@ select option{background:#1a1a2c}
     <!-- CANVAS AREA -->
     <div id="canvas-area">
       <div class="neck-wrap" id="wrap-accord">
-        <div class="neck-label accord" style="display:flex;align-items:center;gap:8px">
+        <div class="neck-label accord" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
           <span>● ACCORD</span>
-          <button onclick="resetChord()" title="Réinitialiser l'accord" style="background:transparent;border:1px solid #334;color:#6688aa;font-family:'JetBrains Mono',monospace;font-size:9px;padding:2px 7px;border-radius:4px;cursor:pointer;line-height:1.4" onmouseover="this.style.borderColor='#00d4ff';this.style.color='#00d4ff'" onmouseout="this.style.borderColor='#334';this.style.color='#6688aa'">↺ reset</button>
+          <button onclick="resetChord()" title="Réinitialiser l'accord" style="background:transparent;border:1px solid #334;color:#6688aa;font-family:'JetBrains Mono',monospace;font-size:9px;padding:2px 7px;border-radius:4px;cursor:pointer;touch-action:manipulation" onmouseover="this.style.borderColor='#00d4ff'" onmouseout="this.style.borderColor='#334'">↺ reset</button>
+          <span style="color:#555;font-size:9px">|</span>
+          <span style="font-size:9px;color:#88aaff;font-family:'JetBrains Mono',monospace">Pos:</span>
+          <button onclick="changePosMin(-1)" style="background:#0d1526;border:1px solid #334;color:#88aaff;font-family:'JetBrains Mono',monospace;font-size:11px;width:22px;height:22px;border-radius:3px;cursor:pointer;touch-action:manipulation;padding:0;line-height:1">◀</button>
+          <span id="pos-min-lbl" style="font-size:11px;color:#00d4ff;font-family:'JetBrains Mono',monospace;min-width:14px;text-align:center">0</span>
+          <button onclick="changePosMin(1)" style="background:#0d1526;border:1px solid #334;color:#88aaff;font-family:'JetBrains Mono',monospace;font-size:11px;width:22px;height:22px;border-radius:3px;cursor:pointer;touch-action:manipulation;padding:0;line-height:1">▶</button>
+          <span style="color:#555;font-size:9px">|</span>
+          <span style="font-size:9px;color:#88cc88;font-family:'JetBrains Mono',monospace">Voicing:</span>
+          <button onclick="changeVoicing(-1)" style="background:#0d1526;border:1px solid #334;color:#88cc88;font-family:'JetBrains Mono',monospace;font-size:11px;width:22px;height:22px;border-radius:3px;cursor:pointer;touch-action:manipulation;padding:0;line-height:1">◀</button>
+          <span id="voicing-lbl" style="font-size:11px;color:#00d4ff;font-family:'JetBrains Mono',monospace;min-width:14px;text-align:center">1</span>
+          <button onclick="changeVoicing(1)" style="background:#0d1526;border:1px solid #334;color:#88cc88;font-family:'JetBrains Mono',monospace;font-size:11px;width:22px;height:22px;border-radius:3px;cursor:pointer;touch-action:manipulation;padding:0;line-height:1">▶</button>
         </div>
         <div class="neck-scroll" id="scroll-cv-accord"><canvas id="cv-accord"></canvas></div>
       </div>
@@ -608,6 +620,8 @@ let state={
   positions:[],
   cnotes:[],
   invIndex:0,
+  posMin:0,       // position minimale du doigté (0=open, 5=5e frette...)
+  voicingIdx:0,   // index de voicing (rotation des positions possibles)
   manualOverrides:{},
   colorMode:"full",
   timbre:"Guitare acier",
@@ -647,12 +661,16 @@ function shortStringFret(){
 function getShortInfo(){
   return isBanjo5()?{0:shortStringFret()}:{};
 }
-function findPositions(tuning,chordNotes,capo){
-  // Passe 1 : chaque note de l'accord obtient la meilleure corde libre
-  // Passe 2 : cordes restantes → n'importe quelle note
+function findPositions(tuning,chordNotes,capo,posMin=0,window=4){
+  // Cherche un voicing dans la fenêtre [posMin, posMin+window]
+  // Passe 1 : chaque note de l'accord obtient la meilleure corde libre dans la fenêtre
+  // Passe 2 : cordes restantes → n'importe quelle note dans la fenêtre
   const cs=new Set(chordNotes);
   const isB5fp=isBanjo5();
   const result={};
+  const W=window||4;
+
+  function inWindow(f){ return f===0||(f>=posMin&&f<=posMin+W); }
 
   for(const target of chordNotes){
     let best=null;
@@ -660,7 +678,7 @@ function findPositions(tuning,chordNotes,capo){
       if(result[si]!==undefined)continue;
       const om=(isB5fp&&si===0)?noteToMidi(tuning[si]):noteToMidi(tuning[si])+capo;
       for(let f=0;f<25;f++){
-        if(NOTES[(om+f)%12]===target){
+        if(NOTES[(om+f)%12]===target&&inWindow(f)){
           if(best===null||f<best[1])best=[si,f,target];
           break;
         }
@@ -672,9 +690,16 @@ function findPositions(tuning,chordNotes,capo){
   for(let si=0;si<tuning.length;si++){
     if(result[si]!==undefined)continue;
     const om=(isB5fp&&si===0)?noteToMidi(tuning[si]):noteToMidi(tuning[si])+capo;
-    for(let f=0;f<25;f++){
+    for(let f=posMin;f<=posMin+W&&f<25;f++){
       const note=NOTES[(om+f)%12];
       if(cs.has(note)){result[si]=[f,note];break;}
+    }
+    // fallback : si rien trouvé dans la fenêtre, cherche partout
+    if(result[si]===undefined){
+      for(let f=0;f<25;f++){
+        const note=NOTES[(om+f)%12];
+        if(cs.has(note)){result[si]=[f,note];break;}
+      }
     }
   }
 
@@ -927,11 +952,15 @@ document.getElementById('capo-sel').addEventListener('change',e=>{
 document.getElementById('root-sel').addEventListener('change',e=>{
   state.rootNote=e.target.value||null;
   state.invIndex=0;
+  state.posMin=0;
+  state.voicingIdx=0;
   computeAndDraw();
 });
 document.getElementById('ctype-sel').addEventListener('change',e=>{
   state.ctype=e.target.value;
   state.invIndex=0;
+  state.posMin=0;
+  state.voicingIdx=0;
   computeAndDraw();
 });
 document.getElementById('scale-sel').addEventListener('change',e=>{
@@ -1123,7 +1152,7 @@ function computeAndDraw(){
     });
   } else {
     state.cnotes=buildChord(state.rootNote,state.ctype);
-    state.positions=findPositions(state.tuning,state.cnotes,state.capo);
+    state.positions=findPositions(state.tuning,state.cnotes,state.capo,state.posMin);
     // Capo >= sf : corde courte sonne plus haut à vide
     // Si la nouvelle note à vide n'est pas dans l'accord → la corde est muette
     if(isBanjo5()&&state.capo>=sfCad){
@@ -1137,6 +1166,8 @@ function computeAndDraw(){
     }
   }
   updateInversions();
+  updatePosLabels();
+  updateChordLegend();
   drawAll();
   updateStatus();
 }
@@ -1153,7 +1184,28 @@ function updateStatus(){
 // ══════════════════════════════════════════════════════════════════
 // NOTES PANEL
 // ══════════════════════════════════════════════════════════════════
-function updateNotesPanel(notes){} // section composition supprimée
+function updateNotesPanel(notes){}  // section composition supprimée
+
+function updateChordLegend(){
+  const el=document.getElementById('legend-chord-notes');
+  if(!el)return;
+  if(!state.rootNote||!state.cnotes||!state.cnotes.length){
+    el.innerHTML=`
+      <div class="legend-row"><div class="legend-dot" style="background:var(--root)"></div><span class="legend-txt">Fondamentale</span></div>
+      <div class="legend-row"><div class="legend-dot" style="background:var(--third)"></div><span class="legend-txt">Tierce</span></div>
+      <div class="legend-row"><div class="legend-dot" style="background:var(--fifth)"></div><span class="legend-txt">Quinte</span></div>
+      <div class="legend-row"><div class="legend-dot" style="background:var(--other)"></div><span class="legend-txt">Extension</span></div>`;
+    return;
+  }
+  const roleNames=['Fondamentale','Tierce','Quinte','7e / Extension','9e','11e','13e'];
+  const html=state.cnotes.map((note,i)=>{
+    const col=noteRole(note,state.rootNote,state.ctype);
+    const fr=NOTES_FR[note]||note;
+    const role=roleNames[Math.min(i,roleNames.length-1)]||'Extension';
+    return `<div class="legend-row"><div class="legend-dot" style="background:${col}"></div><span class="legend-txt"><b style="color:${col}">${fr}</b> — ${role}</span></div>`;
+  }).join('');
+  el.innerHTML=html;
+}
 
 // ══════════════════════════════════════════════════════════════════
 // INVERSIONS
@@ -1245,12 +1297,54 @@ document.querySelectorAll('input[name=vis-mobile]').forEach(r=>{
 });
 
 function resetChord(){
-  // Remet note fondamentale à "aucun accord"
   document.getElementById('root-sel').value='';
   state.rootNote=null;
   state.invIndex=0;
+  state.posMin=0;
+  state.voicingIdx=0;
   state.manualOverrides={};
+  updatePosLabels();
   computeAndDraw();
+}
+
+function updatePosLabels(){
+  const pl=document.getElementById('pos-min-lbl');
+  const vl=document.getElementById('voicing-lbl');
+  if(pl)pl.textContent=state.posMin||'0';
+  if(vl)vl.textContent=(state.voicingIdx+1);
+}
+
+function changePosMin(delta){
+  state.posMin=Math.max(0,Math.min(18,(state.posMin||0)+delta));
+  state.voicingIdx=0;
+  state.manualOverrides={};
+  updatePosLabels();
+  computeAndDraw();
+}
+
+function changeVoicing(delta){
+  if(!state.cnotes||!state.cnotes.length)return;
+  // Générer tous les voicings possibles à posMin en essayant différentes fenêtres
+  const voicings=[];
+  for(let w=3;w<=6;w++){
+    const pos=findPositions(state.tuning,state.cnotes,state.capo,state.posMin,w);
+    const key=pos.map(([s,f])=>s+','+f).join('|');
+    if(!voicings.find(v=>v.key===key))voicings.push({key,pos});
+  }
+  // Aussi essayer les positions décalées de 1-2 frettes
+  for(let off=1;off<=3;off++){
+    for(let w=3;w<=5;w++){
+      const pos=findPositions(state.tuning,state.cnotes,state.capo,(state.posMin||0)+off,w);
+      const key=pos.map(([s,f])=>s+','+f).join('|');
+      if(!voicings.find(v=>v.key===key))voicings.push({key,pos});
+    }
+  }
+  state.voicingIdx=((state.voicingIdx||0)+delta+voicings.length)%voicings.length;
+  state.manualOverrides={};
+  const chosen=voicings[state.voicingIdx];
+  state.positions=chosen.pos;
+  document.getElementById('voicing-lbl').textContent=(state.voicingIdx+1)+'/'+voicings.length;
+  draw();
 }
 
 let arpDir=1; // 1=montant, -1=descendant
