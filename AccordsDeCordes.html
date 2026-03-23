@@ -296,8 +296,8 @@ select option{background:#1a1a2c}
       <span>🔊</span>
       <input type="range" id="vol" min="0" max="1" step="0.05" value="0.3">
       <div class="timbre-wrap">
-        <label>Timbre :</label>
-        <select id="timbre-sel"></select>
+        <label>🎹 Son :</label>
+        <select id="timbre-sel" style="max-width:180px"></select>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Menu">☰</button>
@@ -607,7 +607,238 @@ const STR_THICK={
   "Banjo 5 cordes"     :[1,2.2,1.8,1.4,1],
   "Oud"                :[3,2.5,2,1.6,1.2,1],
 };
-const TIMBRES=["Guitare acier","Guitare nylon","Basse électrique","Basse fretless","Banjo","Mandoline","Ukulele","Oud / Luth","Harpe","Clavecin"];
+// Timbres Karplus-Strong — regroupés par famille
+// ══════════════════════════════════════════════════════════════════
+// SONS — General MIDI par famille, synthèse WebAudio (Android/iOS/Desktop)
+// ══════════════════════════════════════════════════════════════════
+const GM_SOUNDS={
+  // Chaque entrée : { fam, prog, label }  — prog = numéro GM 0-based
+  "── Guitares ──": [
+    {prog:24,label:"Guitare nylon"},
+    {prog:25,label:"Guitare acier"},
+    {prog:26,label:"Jazz électrique"},
+    {prog:27,label:"Clean électrique"},
+    {prog:28,label:"Muted Guitar"},
+    {prog:29,label:"Overdrive"},
+    {prog:30,label:"Distortion"},
+    {prog:31,label:"Harmonics"},
+  ],
+  "── Basses ──": [
+    {prog:32,label:"Basse acoustique"},
+    {prog:33,label:"Basse doigts"},
+    {prog:34,label:"Basse médiator"},
+    {prog:35,label:"Basse fretless"},
+    {prog:36,label:"Slap Bass 1"},
+    {prog:37,label:"Slap Bass 2"},
+    {prog:38,label:"Synth Bass 1"},
+    {prog:39,label:"Synth Bass 2"},
+  ],
+  "── Cordes pincées ──": [
+    {prog:6,label:"Clavecin"},
+    {prog:15,label:"Dulcimer"},
+    {prog:46,label:"Harpe"},
+    {prog:104,label:"Sitar"},
+    {prog:105,label:"Banjo"},
+    {prog:106,label:"Shamisen"},
+    {prog:107,label:"Koto"},
+  ],
+  "── Cordes frottées ──": [
+    {prog:40,label:"Violon"},
+    {prog:41,label:"Alto"},
+    {prog:42,label:"Violoncelle"},
+    {prog:45,label:"Pizzicato cordes"},
+    {prog:48,label:"Ensemble cordes"},
+  ],
+  "── Piano & Claviers ──": [
+    {prog:0,label:"Piano acoustique"},
+    {prog:1,label:"Piano bright"},
+    {prog:4,label:"Piano électrique 1"},
+    {prog:5,label:"Piano électrique 2"},
+    {prog:8,label:"Célesta"},
+    {prog:11,label:"Vibraphone"},
+    {prog:12,label:"Marimba"},
+    {prog:13,label:"Xylophone"},
+  ],
+  "── Orgues & Vents ──": [
+    {prog:16,label:"Orgue drawbar"},
+    {prog:19,label:"Orgue église"},
+    {prog:21,label:"Accordéon"},
+    {prog:22,label:"Harmonica"},
+    {prog:73,label:"Flûte"},
+    {prog:68,label:"Hautbois"},
+    {prog:71,label:"Clarinette"},
+  ],
+  "── Cuivres & Ethno ──": [
+    {prog:56,label:"Trompette"},
+    {prog:57,label:"Trombone"},
+    {prog:64,label:"Saxophone soprano"},
+    {prog:65,label:"Saxophone alto"},
+    {prog:108,label:"Kalimba"},
+    {prog:110,label:"Fiddle"},
+  ],
+  "── Synth ──": [
+    {prog:80,label:"Lead carré"},
+    {prog:81,label:"Lead dent de scie"},
+    {prog:88,label:"Pad new age"},
+    {prog:89,label:"Pad warm"},
+    {prog:114,label:"Steel Drums"},
+  ],
+};
+
+// Paramètre de synthèse WebAudio par prog GM
+// { osc: type|'karplus', env:{a,d,s,r}, harmonics:[{freq_mult,gain}], filter:{type,freq,q}, dur }
+function _gmSynthParams(prog){
+  // Guitares pincées → Karplus-Strong
+  if(prog>=24&&prog<=31) return{type:'karplus', sw:prog===24?8:prog===25?3:prog===28?1:2,
+    dk:[0.9995,0.9992,0.9988,0.9982], dur:prog===29||prog===30?2.5:1.5,
+    bright:prog>=26, bass:false};
+  // Basses → Karplus grave
+  if(prog>=32&&prog<=39) return{type:'karplus', sw:prog===35?2:1,
+    dk:[0.9997,0.9995,0.9992,0.9988], dur:2.0, bass:true,
+    bright:false, slap:prog===36||prog===37};
+  // Harpe, Koto, Banjo, Sitar → Karplus
+  if([6,15,46,104,105,106,107].includes(prog)) return{type:'karplus',
+    sw:prog===6?0:prog===46?6:2, dk:[0.9992,0.9988,0.9983,0.9976], dur:prog===46?2.5:1.4, bass:false};
+  // Piano → additive triangle + decay rapide
+  if(prog<=5||prog===8) return{type:'adsr', osc:'triangle',
+    env:{a:0.004,d:0.3,s:0.4,r:0.8}, dur:3.0,
+    harmonics:[{m:2,g:0.3},{m:3,g:0.15},{m:4,g:0.07}], filter:{type:'lowpass',freq:5000,q:0.5}};
+  // Vibraphone, Marimba, Xylophone → sinusoïde + decay moyen
+  if([11,12,13].includes(prog)) return{type:'adsr', osc:'sine',
+    env:{a:0.002,d:0.5,s:0.2,r:0.6}, dur:2.0, harmonics:[{m:2,g:0.2},{m:4,g:0.05}], filter:null};
+  // Pizzicato, ensemble cordes → Karplus doux
+  if(prog===45||prog===48||prog>=40&&prog<=44) return{type:'karplus',
+    sw:7, dk:[0.9992,0.9989,0.9984,0.9977], dur:1.5, bass:false};
+  // Orgues, accordéon → onde carrée + sustain long
+  if(prog>=16&&prog<=23) return{type:'adsr', osc:'square',
+    env:{a:0.02,d:0.1,s:0.9,r:0.15}, dur:2.5, harmonics:[], filter:{type:'lowpass',freq:2000,q:0.7}};
+  // Flûte, hautbois, clarinette → sine + légère modulation
+  if(prog>=68&&prog<=75) return{type:'adsr', osc:'sine',
+    env:{a:0.05,d:0.1,s:0.8,r:0.2}, dur:2.0, harmonics:[{m:3,g:0.1}], filter:{type:'bandpass',freq:2500,q:1}};
+  // Cuivres, saxos → onde carrée brillante
+  if(prog>=56&&prog<=67) return{type:'adsr', osc:'sawtooth',
+    env:{a:0.04,d:0.15,s:0.7,r:0.2}, dur:1.8, harmonics:[], filter:{type:'lowpass',freq:3500,q:1.2}};
+  // Synth lead carré/saw → square ou sawtooth
+  if(prog===80) return{type:'adsr', osc:'square',
+    env:{a:0.005,d:0.2,s:0.6,r:0.3}, dur:2.0, harmonics:[], filter:{type:'lowpass',freq:4000,q:2}};
+  if(prog===81) return{type:'adsr', osc:'sawtooth',
+    env:{a:0.005,d:0.3,s:0.5,r:0.3}, dur:2.0, harmonics:[], filter:{type:'lowpass',freq:3000,q:1.5}};
+  // Pad → sine doux + attack lent
+  if(prog>=88&&prog<=95) return{type:'adsr', osc:'sine',
+    env:{a:0.3,d:0.2,s:0.8,r:0.8}, dur:3.0, harmonics:[{m:2,g:0.2}], filter:{type:'lowpass',freq:2000,q:0.5}};
+  // Kalimba, Steel Drums → sinusoïde + decay court
+  if([108,114].includes(prog)) return{type:'adsr', osc:'sine',
+    env:{a:0.002,d:0.4,s:0.1,r:0.3}, dur:1.5, harmonics:[{m:4,g:0.15}], filter:null};
+  // Défaut → Karplus
+  return{type:'karplus', sw:3, dk:[0.9994,0.9991,0.9987,0.9982], dur:1.5, bass:false};
+}
+
+// État son courant
+let _currentProg=25; // Guitare acier par défaut
+const TIMBRES=['Guitare acier']; // compatibilité state.timbre
+
+// ══════════════════════════════════════════════════════════════════
+// AUDIO ENGINE (WebAudio — fonctionne Android, iOS, Desktop)
+// ══════════════════════════════════════════════════════════════════
+let audioCtx=null;
+function getAudioCtx(){
+  if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  if(audioCtx.state==='suspended')audioCtx.resume();
+  return audioCtx;
+}
+
+function _karplusBuffer(ctx, freq, params, vol){
+  const sr=ctx.sampleRate;
+  const p=params;
+  const dur=p.dur||1.5;
+  const period=Math.max(2,Math.round(sr/freq));
+  const nSamples=Math.round(sr*dur);
+  let buf=[];
+  if(p.slap){
+    for(let k=0;k<period;k++)buf.push(k<period*0.3?(Math.random()*2-1)*1.5:0);
+  } else {
+    for(let k=0;k<period;k++)buf.push(Math.random()*2-1);
+  }
+  const sw=p.sw??3;
+  for(let s=0;s<sw;s++)for(let k=0;k<period;k++)buf[k]=0.5*(buf[k]+buf[(k+1)%period]);
+  const dk=p.dk||[0.9995,0.9992,0.9988,0.9982];
+  const decay=freq<100?dk[0]:freq<200?dk[1]:freq<400?dk[2]:dk[3];
+  const out=new Float32Array(nSamples);
+  for(let i=0;i<nSamples;i++){
+    const s=buf[i%period];out[i]=s;
+    buf[i%period]=decay*0.5*(s+buf[(i+1)%period]);
+  }
+  if(p.bright)for(let i=1;i<out.length;i++)out[i]=out[i]*0.7+(out[i]-out[i-1])*0.45;
+  const fade=Math.max(1,Math.round(nSamples*0.08));
+  for(let k=0;k<fade;k++)out[nSamples-fade+k]*=(1-k/fade);
+  const gain=p.bass?(freq<120?2.2:freq<200?1.7:1.3):(freq<120?1.8:freq<200?1.4:1.15);
+  for(let i=0;i<out.length;i++)out[i]=Math.max(-1,Math.min(1,out[i]*gain*vol));
+  const audioBuf=ctx.createBuffer(1,nSamples,sr);
+  audioBuf.getChannelData(0).set(out);
+  return audioBuf;
+}
+
+function _playOneNote(ctx, freq, prog, vol, startTime){
+  const p=_gmSynthParams(prog);
+  if(p.type==='karplus'){
+    const buf=_karplusBuffer(ctx,freq,p,vol);
+    const src=ctx.createBufferSource();
+    src.buffer=buf;
+    src.connect(ctx.destination);
+    src.start(startTime);
+    return;
+  }
+  // ADSR oscillator
+  const env=p.env;
+  const dur=p.dur||2.0;
+  const gain=ctx.createGain();
+  gain.connect(ctx.destination);
+  gain.gain.setValueAtTime(0,startTime);
+  gain.gain.linearRampToValueAtTime(vol,startTime+env.a);
+  gain.gain.linearRampToValueAtTime(vol*env.s,startTime+env.a+env.d);
+  gain.gain.setValueAtTime(vol*env.s,startTime+dur-env.r);
+  gain.gain.linearRampToValueAtTime(0,startTime+dur);
+
+  let node=gain;
+  if(p.filter){
+    const flt=ctx.createBiquadFilter();
+    flt.type=p.filter.type;
+    flt.frequency.value=p.filter.freq;
+    flt.Q.value=p.filter.q||1;
+    flt.connect(gain);
+    node=flt;
+  }
+
+  const osc=ctx.createOscillator();
+  osc.type=p.osc||'sine';
+  osc.frequency.value=freq;
+  osc.connect(node);
+  osc.start(startTime);
+  osc.stop(startTime+dur);
+
+  // Harmoniques additives
+  (p.harmonics||[]).forEach(({m,g})=>{
+    const h=ctx.createOscillator();
+    const hg=ctx.createGain();
+    hg.gain.value=g*vol;
+    h.type='sine'; h.frequency.value=freq*m;
+    h.connect(hg); hg.connect(ctx.destination);
+    h.start(startTime); h.stop(startTime+dur);
+  });
+}
+
+function playMidiNotes(midiNotes,arpMs=130){
+  try{
+    const ctx=getAudioCtx();
+    const now=ctx.currentTime;
+    const vol=state.volume;
+    midiNotes.forEach((midi,i)=>{
+      const freq=midiToFreq(midi);
+      const t=now+i*arpMs/1000;
+      _playOneNote(ctx,freq,_currentProg,vol,t);
+    });
+  }catch(e){console.warn('Audio:',e)}
+}
 
 // ══════════════════════════════════════════════════════════════════
 // STATE
@@ -667,25 +898,125 @@ function shortStringFret(){
 function getShortInfo(){
   return isBanjo5()?{0:shortStringFret()}:{};
 }
+// ══════════════════════════════════════════════════════════════════
+// BASE DE DONNÉES ACCORDS OUVERTS STANDARDS (guitare 6 cordes)
+// Format : [corde6(grave)..corde1(aigu)], -1=muette, 0=vide, n=frette
+// ══════════════════════════════════════════════════════════════════
+const OPEN_CHORD_DB={
+  // Majeurs ouverts
+  "C-majeur":  [-1,3,2,0,1,0],
+  "D-majeur":  [-1,-1,0,2,3,2],
+  "E-majeur":  [0,2,2,1,0,0],
+  "F-majeur":  [1,3,3,2,1,1],   // barré 1
+  "G-majeur":  [3,2,0,0,0,3],
+  "A-majeur":  [-1,0,2,2,2,0],
+  "B-majeur":  [-1,2,4,4,4,2],  // barré 2
+  // Mineurs ouverts
+  "C-mineur":  [-1,3,5,5,4,3],  // barré 3
+  "D-mineur":  [-1,-1,0,2,3,1],
+  "E-mineur":  [0,2,2,0,0,0],
+  "F-mineur":  [1,3,3,1,1,1],   // barré 1
+  "G-mineur":  [3,5,5,3,3,3],   // barré 3
+  "A-mineur":  [-1,0,2,2,1,0],
+  "B-mineur":  [-1,2,4,4,3,2],  // barré 2
+  // 7e de dominante
+  "C-7":       [-1,3,2,3,1,0],
+  "D-7":       [-1,-1,0,2,1,2],
+  "E-7":       [0,2,0,1,0,0],
+  "F-7":       [1,3,1,2,1,1],
+  "G-7":       [3,2,0,0,0,1],
+  "A-7":       [-1,0,2,0,2,0],
+  "B-7":       [-1,2,1,2,0,2],
+  // Maj7
+  "C-maj7":    [-1,3,2,0,0,0],
+  "D-maj7":    [-1,-1,0,2,2,2],
+  "E-maj7":    [0,2,1,1,0,0],
+  "F-maj7":    [-1,-1,3,2,1,0],
+  "G-maj7":    [3,2,0,0,0,2],
+  "A-maj7":    [-1,0,2,1,2,0],
+  "B-maj7":    [-1,2,4,3,4,2],
+  // Min7
+  "C-min7":    [-1,3,1,0,1,0],  // alt: barré
+  "D-min7":    [-1,-1,0,2,1,1],
+  "E-min7":    [0,2,0,0,0,0],
+  "F-min7":    [1,3,1,1,1,1],
+  "G-min7":    [3,5,3,3,3,3],
+  "A-min7":    [-1,0,2,0,1,0],
+  "B-min7":    [-1,2,0,2,0,2],
+  // Sus2 et Sus4
+  "D-sus2":    [-1,-1,0,2,3,0],
+  "E-sus2":    [0,2,2,4,0,0],
+  "A-sus2":    [-1,0,2,2,0,0],
+  "G-sus2":    [3,0,0,0,1,3],
+  "D-sus4":    [-1,-1,0,2,3,3],
+  "E-sus4":    [0,2,2,2,0,0],
+  "A-sus4":    [-1,0,2,2,3,0],
+  "G-sus4":    [3,3,0,0,1,1],
+  // Accords add
+  "C-add9":    [-1,3,2,0,3,0],
+  "D-add9":    [-1,-1,0,2,3,0],
+  "G-add9":    [3,0,0,0,0,3],
+  "A-add9":    [-1,0,2,4,2,0],
+  // Power chords
+  "E-5":       [0,2,2,-1,-1,-1],
+  "A-5":       [-1,0,2,2,-1,-1],
+  "D-5":       [-1,-1,0,2,3,-1],
+  "G-5":       [3,5,5,-1,-1,-1],
+  // Diminués
+  "B-dim":     [-1,2,3,4,3,-1],
+  "E-dim":     [0,1,2,3,-1,-1],
+  // Augmentés
+  "E-aug":     [0,3,2,1,1,0],
+  "A-aug":     [-1,0,3,2,2,1],
+};
+
+// Convertit un accord DB en positions [si, fret, note]
+function _dbChordToPositions(frets, tuning, capo){
+  const positions=[];
+  for(let si=0;si<Math.min(frets.length,tuning.length);si++){
+    const f=frets[si];
+    if(f===-1)continue;
+    const midi=noteToMidi(tuning[si])+capo+f;
+    const note=NOTES[midi%12];
+    positions.push([si,f,note]);
+  }
+  return positions;
+}
+
 function findPositions(tuning,chordNotes,capo,posMin=0,window=4){
-  // Cherche un voicing dans la fenêtre [posMin, posMin+window]
-  // Passe 1 : chaque note de l'accord obtient la meilleure corde libre dans la fenêtre
-  // Passe 2 : cordes restantes → n'importe quelle note dans la fenêtre
   const cs=new Set(chordNotes);
   const isB5fp=isBanjo5();
-  const result={};
+
+  // ── 1. Chercher dans la base d'accords ouverts (guitare 6c, capo=0, posMin=0) ──
+  if(!isB5fp && tuning.length===6 && capo===0 && posMin===0 && state.rootNote){
+    const key=`${state.rootNote}-${state.ctype}`;
+    if(OPEN_CHORD_DB[key]){
+      const pos=_dbChordToPositions(OPEN_CHORD_DB[key], tuning, 0);
+      // Vérifier que toutes les notes de l'accord sont couvertes
+      const coveredNotes=new Set(pos.map(([,,n])=>n));
+      const allCovered=chordNotes.every(n=>coveredNotes.has(n));
+      if(allCovered) return pos;
+    }
+  }
+
+  // ── 2. Algorithme amélioré : score de jouabilité ──
   const W=window||4;
+  const result={};
 
   function inWindow(f){ return f===0||(f>=posMin&&f<=posMin+W); }
 
+  // Passe 1 : assigner chaque note de l'accord à la meilleure corde
+  // "meilleure" = frette la plus basse, préférence aux cordes à vide
   for(const target of chordNotes){
-    let best=null;
+    let best=null, bestScore=Infinity;
     for(let si=0;si<tuning.length;si++){
       if(result[si]!==undefined)continue;
       const om=(isB5fp&&si===0)?noteToMidi(tuning[si]):noteToMidi(tuning[si])+capo;
       for(let f=0;f<25;f++){
         if(NOTES[(om+f)%12]===target&&inWindow(f)){
-          if(best===null||f<best[1])best=[si,f,target];
+          // Score : frette basse = bien, corde à vide = très bien
+          const score=f===0?-1:f;
+          if(score<bestScore){bestScore=score;best=[si,f,target];}
           break;
         }
       }
@@ -693,18 +1024,41 @@ function findPositions(tuning,chordNotes,capo,posMin=0,window=4){
     if(best)result[best[0]]=[best[1],best[2]];
   }
 
+  // Passe 2 : cordes non assignées → note de l'accord la plus grave possible
   for(let si=0;si<tuning.length;si++){
     if(result[si]!==undefined)continue;
     const om=(isB5fp&&si===0)?noteToMidi(tuning[si]):noteToMidi(tuning[si])+capo;
-    for(let f=posMin;f<=posMin+W&&f<25;f++){
+    // Préférer les cordes à vide
+    for(let f=0;f<=posMin+W&&f<25;f++){
+      if(f>0&&f<posMin)continue;
       const note=NOTES[(om+f)%12];
       if(cs.has(note)){result[si]=[f,note];break;}
     }
-    // fallback : si rien trouvé dans la fenêtre, cherche partout
+    // Fallback global
     if(result[si]===undefined){
       for(let f=0;f<25;f++){
         const note=NOTES[(om+f)%12];
         if(cs.has(note)){result[si]=[f,note];break;}
+      }
+    }
+  }
+
+  // ── 3. Post-traitement : muter les cordes graves qui cassent la jouabilité ──
+  // Si une corde grave a une frette très haute alors que les autres sont basses,
+  // la muter est plus jouable
+  const positions=Object.entries(result).sort((a,b)=>+a[0]-+b[0]).map(([si,[f,n]])=>[+si,f,n]);
+  if(positions.length>0&&posMin===0){
+    const frets=positions.filter(([,f])=>f>0).map(([,f])=>f);
+    if(frets.length>0){
+      const maxF=Math.max(...frets);
+      const minF=Math.min(...frets.filter(f=>f>0));
+      // Si l'écart est > 4 frettes, muter la corde la plus problématique
+      if(maxF-minF>4){
+        const outlier=positions.find(([,f])=>f===maxF);
+        if(outlier){
+          const [outSi]=outlier;
+          delete result[outSi];
+        }
       }
     }
   }
@@ -720,95 +1074,30 @@ function scaleColor(deg,noteI,rootI){
 }
 
 // ══════════════════════════════════════════════════════════════════
-// AUDIO (Karplus-Strong via Web Audio)
+// BARRÉ DETECTION
 // ══════════════════════════════════════════════════════════════════
-let audioCtx=null;
-function getAudioCtx(){
-  if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();
-  if(audioCtx.state==='suspended')audioCtx.resume();
-  return audioCtx;
-}
-
-function karplus(freq,duration=1.4,timbre='Guitare acier'){
-  const sr=44100;
-  const period=Math.max(2,Math.round(sr/freq));
-  const nSamples=Math.round(sr*duration);
-  let buf=Array.from({length:period},()=>Math.random()*2-1);
-
-  // Smooth by timbre
-  const smooths={
-    'Guitare nylon':8,'Basse électrique':1,'Basse fretless':2,
-    'Banjo':1,'Ukulele':5,'Oud / Luth':4,'Harpe':6,'Clavecin':0,
-  };
-  const sw=smooths[timbre]??3;
-  for(let s=0;s<sw;s++)for(let k=0;k<period;k++)buf[k]=0.5*(buf[k]+buf[(k+1)%period]);
-
-  // Decay
-  const decayMap={
-    'Guitare acier':   [0.9995,0.9992,0.9988,0.9982],
-    'Guitare nylon':   [0.9993,0.9990,0.9985,0.9978],
-    'Basse électrique':[0.9997,0.9995,0.9992,0.9988],
-    'Basse fretless':  [0.9996,0.9993,0.9990,0.9985],
-    'Banjo':           [0.9988,0.9982,0.9975,0.9965],
-    'Mandoline':       [0.9985,0.9978,0.9970,0.9960],
-    'Ukulele':         [0.9990,0.9985,0.9978,0.9968],
-    'Oud / Luth':      [0.9993,0.9989,0.9984,0.9977],
-    'Harpe':           [0.9996,0.9994,0.9991,0.9986],
-    'Clavecin':        [0.9980,0.9972,0.9965,0.9955],
-  };
-  const dk=decayMap[timbre]||[0.9995,0.9992,0.9988,0.9982];
-  const decay=freq<100?dk[0]:freq<200?dk[1]:freq<400?dk[2]:dk[3];
-
-  const out=new Float32Array(nSamples);
-  for(let i=0;i<nSamples;i++){
-    const s=buf[i%period];
-    out[i]=s;
-    buf[i%period]=decay*0.5*(s+buf[(i+1)%period]);
-  }
-  // Fade out
-  const fade=Math.max(1,Math.round(nSamples*0.08));
-  for(let k=0;k<fade;k++)out[nSamples-fade+k]*=(1-k/fade);
-
-  // Gain for bass
-  let gain=1;
-  if(['Basse électrique','Basse fretless'].includes(timbre)){
-    gain=freq<120?2:freq<200?1.6:freq<300?1.2:1;
-  } else{
-    gain=freq<120?1.8:freq<200?1.4:freq<300?1.15:1;
-  }
-  if(gain!==1)for(let i=0;i<out.length;i++)out[i]=Math.max(-1,Math.min(1,out[i]*gain));
-  return out;
-}
-
-function playMidiNotes(midiNotes,arpMs=130){
-  try{
-    const ctx=getAudioCtx();
-    const sr=44100,dur=1.4;
-    const arpSamples=Math.round(arpMs*sr/1000);
-    const total=Math.round(sr*dur)+arpSamples*midiNotes.length;
-    const mix=new Float32Array(total);
-
-    const waves=midiNotes.map((midi,i)=>{
-      const w=karplus(midiToFreq(midi),dur,state.timbre);
-      return{w,offset:i*arpSamples};
-    });
-
-    let peak=0;
-    for(const{w,offset}of waves){
-      for(let i=0;i<w.length;i++){
-        const idx=offset+i;
-        if(idx<total){mix[idx]+=w[i];if(Math.abs(mix[idx])>peak)peak=Math.abs(mix[idx]);}
-      }
+// Retourne [{fret, strings:[si,...], fromStr, toStr}] — barrés détectés dans positions
+function detectBarres(positions){
+  if(!positions||positions.length<2)return[];
+  // Grouper les frettes non nulles
+  const byFret={};
+  positions.forEach(([si,f])=>{if(f>0)byFret[f]=(byFret[f]||[]).concat(si);});
+  const barres=[];
+  for(const [fStr,strings] of Object.entries(byFret)){
+    const f=parseInt(fStr);
+    if(strings.length<2)continue;
+    // Trier les cordes (index croissant = grave → aigu visuellement)
+    const sorted=[...strings].sort((a,b)=>a-b);
+    // Vérifier que toutes les cordes entre min et max sont présentes ou plus haute frette
+    // (barré classique : min_corde à max_corde sur la même frette, toutes les cordes intermédiaires ≥ fret)
+    const minSi=sorted[0], maxSi=sorted[sorted.length-1];
+    // Construire ensemble des cordes dans la plage
+    const inRange=positions.filter(([si,fr])=>si>=minSi&&si<=maxSi&&fr>=f);
+    if(inRange.length===maxSi-minSi+1&&sorted.length>=2){
+      barres.push({fret:f, fromStr:minSi, toStr:maxSi, strings:sorted});
     }
-    if(peak>0.001){const sc=0.88*state.volume/peak;for(let i=0;i<mix.length;i++)mix[i]*=sc;}
-
-    const buf=ctx.createBuffer(1,total,sr);
-    buf.getChannelData(0).set(mix);
-    const src=ctx.createBufferSource();
-    src.buffer=buf;
-    src.connect(ctx.destination);
-    src.start();
-  }catch(e){console.warn('Audio:',e)}
+  }
+  return barres;
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -852,10 +1141,18 @@ function initSelects(){
   const mo=document.createElement('option');mo.value='';mo.textContent='— Aucun mode —';moSel.appendChild(mo);
   Object.keys(MODES).forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=k;moSel.appendChild(o);});
 
-  // Timbre
+  // Son — sélecteur GM groupé par famille
   const tSel=document.getElementById('timbre-sel');
-  TIMBRES.forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;tSel.appendChild(o);});
-  tSel.value='Guitare acier';
+  tSel.innerHTML='';
+  for(const[grp,sounds] of Object.entries(GM_SOUNDS)){
+    const og=document.createElement('optgroup');og.label=grp;
+    sounds.forEach(({prog,label})=>{
+      const o=document.createElement('option');o.value=prog;o.textContent=label;
+      if(prog===_currentProg)o.selected=true;
+      og.appendChild(o);
+    });
+    tSel.appendChild(og);
+  }
 }
 
 function buildTuningUI(){
@@ -978,7 +1275,10 @@ document.getElementById('mode-sel').addEventListener('change',e=>{
   drawMode();
 });
 document.getElementById('vol').addEventListener('input',e=>{state.volume=parseFloat(e.target.value)});
-document.getElementById('timbre-sel').addEventListener('change',e=>{state.timbre=e.target.value});
+document.getElementById('timbre-sel').addEventListener('change',e=>{
+  _currentProg=parseInt(e.target.value)||25;
+  state.timbre=e.target.options[e.target.selectedIndex].text;
+});
 document.getElementById('play-btn').addEventListener('click',playChord);
 document.querySelectorAll('input[name=cmode]').forEach(r=>r.addEventListener('change',()=>{drawScale();drawMode();}));
 
@@ -1606,6 +1906,43 @@ function draw(){
       ctx.strokeStyle=isFretZero?'#2ecc71':'rgba(255,255,255,0.3)';ctx.lineWidth=1.5;
       ctx.beginPath();ctx.arc(openX,y,5,0,Math.PI*2);ctx.stroke();
     }
+  }
+
+  // ── BARRÉS ──
+  const barres=detectBarres(state.positions);
+  for(const barre of barres){
+    const{fret,fromStr,toStr}=barre;
+    const isB5b=isBanjo5();
+    const shortFretB=isB5b?shortStringFret():0;
+    const voffB=0; // barrés toujours sur cordes normales
+    const xb=sx(fret+voffB-0.5);
+    const yTop=sy(toStr);   // toStr = plus aigu = haut visuellement
+    const yBot=sy(fromStr); // fromStr = plus grave = bas visuellement
+    const rB=rDot*1.05;
+    // Rectangle arrondi du barré (bande verticale)
+    ctx.save();
+    ctx.globalAlpha=0.55;
+    ctx.fillStyle='#8855ff';
+    ctx.strokeStyle='#bb88ff';
+    ctx.lineWidth=1.5;
+    const bw=rB*2;
+    const bh=yBot-yTop+rB*2;
+    const bx=xb-rB, by=yTop-rB;
+    const br=rB;
+    ctx.beginPath();
+    ctx.moveTo(bx+br,by);ctx.lineTo(bx+bw-br,by);ctx.quadraticCurveTo(bx+bw,by,bx+bw,by+br);
+    ctx.lineTo(bx+bw,by+bh-br);ctx.quadraticCurveTo(bx+bw,by+bh,bx+bw-br,by+bh);
+    ctx.lineTo(bx+br,by+bh);ctx.quadraticCurveTo(bx,by+bh,bx,by+bh-br);
+    ctx.lineTo(bx,by+br);ctx.quadraticCurveTo(bx,by,bx+br,by);ctx.closePath();
+    ctx.fill();ctx.stroke();
+    ctx.restore();
+    // Label "B" + numéro de frette
+    ctx.save();
+    ctx.fillStyle='#dd99ff';
+    ctx.font='bold 8px JetBrains Mono,monospace';
+    ctx.textAlign='center';
+    ctx.fillText('B'+fret, xb, yTop-rB-3);
+    ctx.restore();
   }
 
   // Main dots
