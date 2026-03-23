@@ -648,19 +648,37 @@ function getShortInfo(){
   return isBanjo5()?{0:shortStringFret()}:{};
 }
 function findPositions(tuning,chordNotes,capo){
+  // Passe 1 : chaque note de l'accord obtient la meilleure corde libre
+  // Passe 2 : cordes restantes → n'importe quelle note
   const cs=new Set(chordNotes);
-  const res=[];
   const isB5fp=isBanjo5();
-  const sfFp=isB5fp?shortStringFret():0;
+  const result={};
+
+  for(const target of chordNotes){
+    let best=null;
+    for(let si=0;si<tuning.length;si++){
+      if(result[si]!==undefined)continue;
+      const om=(isB5fp&&si===0)?noteToMidi(tuning[si]):noteToMidi(tuning[si])+capo;
+      for(let f=0;f<25;f++){
+        if(NOTES[(om+f)%12]===target){
+          if(best===null||f<best[1])best=[si,f,target];
+          break;
+        }
+      }
+    }
+    if(best)result[best[0]]=[best[1],best[2]];
+  }
+
   for(let si=0;si<tuning.length;si++){
-    // Corde courte : base SANS capo (elle est indépendante du capo)
+    if(result[si]!==undefined)continue;
     const om=(isB5fp&&si===0)?noteToMidi(tuning[si]):noteToMidi(tuning[si])+capo;
     for(let f=0;f<25;f++){
       const note=NOTES[(om+f)%12];
-      if(cs.has(note)){res.push([si,f,note]);break}
+      if(cs.has(note)){result[si]=[f,note];break;}
     }
   }
-  return res;
+
+  return Object.entries(result).sort((a,b)=>+a[0]-+b[0]).map(([si,[f,n]])=>[+si,f,n]);
 }
 function scaleColor(deg,noteI,rootI){
   const cm=document.querySelector('input[name=cmode]:checked').value;
