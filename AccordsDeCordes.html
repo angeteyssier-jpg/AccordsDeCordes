@@ -348,7 +348,18 @@ select option{background:#1a1a2c}
       <div class="section">
         <div class="section-hdr closed" data-section="ctype"><span class="arrow">▼</span> TYPE D'ACCORD</div>
         <div class="section-body hidden" id="sect-ctype">
-          <select id="ctype-sel" style="width:100%"></select>
+          <select id="ctype-sel" style="width:100%;margin-bottom:6px"></select>
+          <!-- Accord personnalisé — visible seulement si "personnalise" sélectionné -->
+          <div id="custom-chord-builder" style="display:none;margin-bottom:6px">
+            <div style="font-size:9px;color:#ffaa44;font-family:'JetBrains Mono',monospace;
+                        text-transform:uppercase;letter-spacing:.05em;margin:0 0 4px">
+              ✎ Cocher les degrés
+            </div>
+            <div id="custom-degree-checks" style="display:flex;flex-direction:column;gap:3px"></div>
+          </div>
+          <!-- Degrés de l'accord : tous affichés, cochés = présents dans l'accord courant -->
+          <div style="font-size:9px;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.05em;margin:4px 0 3px">Degrés</div>
+          <div id="degree-checks" style="display:flex;flex-direction:column;gap:2px"></div>
         </div>
       </div>
 
@@ -412,16 +423,6 @@ select option{background:#1a1a2c}
       <div class="section">
         <div class="section-hdr closed" data-section="legend"><span class="arrow">▼</span> LÉGENDE</div>
         <div class="section-body hidden" id="sect-legend">
-          <div class="legend-section">Notes de l'accord</div>
-          <div id="legend-chord-notes">
-            <div class="legend-row"><div class="legend-dot" style="background:#FF3300"></div><span class="legend-txt">1 — Fondamentale</span></div>
-            <div class="legend-row"><div class="legend-dot" style="background:#FF8800"></div><span class="legend-txt">2e / 9e</span></div>
-            <div class="legend-row"><div class="legend-dot" style="background:#22CC44"></div><span class="legend-txt">3 — Tierce</span></div>
-            <div class="legend-row"><div class="legend-dot" style="background:#00CCCC"></div><span class="legend-txt">4e / 11e</span></div>
-            <div class="legend-row"><div class="legend-dot" style="background:#3399FF"></div><span class="legend-txt">5 — Quinte</span></div>
-            <div class="legend-row"><div class="legend-dot" style="background:#AA44FF"></div><span class="legend-txt">6e / 13e</span></div>
-            <div class="legend-row"><div class="legend-dot" style="background:#FFD700"></div><span class="legend-txt">7e</span></div>
-          </div>
           <div class="legend-section">État des cordes</div>
           <div class="legend-row"><div class="legend-ring" style="color:var(--open)"></div><span class="legend-txt">Corde à vide (accord)</span></div>
           <div class="legend-row"><div class="legend-dot" style="background:var(--mute);border-radius:2px"></div><span class="legend-txt">Corde muette</span></div>
@@ -447,13 +448,8 @@ select option{background:#1a1a2c}
           <span style="color:#555;font-size:9px">|</span>
           <span style="font-size:9px;color:#88aaff;font-family:'JetBrains Mono',monospace">Pos:</span>
           <button onclick="changePosMin(-1)" style="background:#0d1526;border:1px solid #334;color:#88aaff;font-family:'JetBrains Mono',monospace;font-size:11px;width:22px;height:22px;border-radius:3px;cursor:pointer;touch-action:manipulation;padding:0;line-height:1">◀</button>
-          <span id="pos-min-lbl" style="font-size:11px;color:#00d4ff;font-family:'JetBrains Mono',monospace;min-width:14px;text-align:center">0</span>
+          <span id="pos-min-lbl" style="font-size:11px;color:#00d4ff;font-family:'JetBrains Mono',monospace;min-width:20px;text-align:center">0</span>
           <button onclick="changePosMin(1)" style="background:#0d1526;border:1px solid #334;color:#88aaff;font-family:'JetBrains Mono',monospace;font-size:11px;width:22px;height:22px;border-radius:3px;cursor:pointer;touch-action:manipulation;padding:0;line-height:1">▶</button>
-          <span style="color:#555;font-size:9px">|</span>
-          <span style="font-size:9px;color:#88cc88;font-family:'JetBrains Mono',monospace">Voicing:</span>
-          <button onclick="changeVoicing(-1)" style="background:#0d1526;border:1px solid #334;color:#88cc88;font-family:'JetBrains Mono',monospace;font-size:11px;width:22px;height:22px;border-radius:3px;cursor:pointer;touch-action:manipulation;padding:0;line-height:1">◀</button>
-          <span id="voicing-lbl" style="font-size:11px;color:#00d4ff;font-family:'JetBrains Mono',monospace;min-width:14px;text-align:center">1</span>
-          <button onclick="changeVoicing(1)" style="background:#0d1526;border:1px solid #334;color:#88cc88;font-family:'JetBrains Mono',monospace;font-size:11px;width:22px;height:22px;border-radius:3px;cursor:pointer;touch-action:manipulation;padding:0;line-height:1">▶</button>
         </div>
         <div class="neck-scroll" id="scroll-cv-accord"><canvas id="cv-accord"></canvas></div>
       </div>
@@ -545,6 +541,8 @@ const CHORD_FORMULAS = {
   "13#9" : [[0,4,7,10,15,21],  "1 - 3 - 5 - b7 - #9 - 13"],
   "13#11" : [[0,4,7,10,14,18,21],"1 - 3 - 5 - b7 - 9 - #11 - 13"],
   "13sus4" : [[0,5,7,10,14,21],  "1 - 4 - 5 - b7 - 9 - 13"],
+  // Accord personnalisé — intervalles modifiables par l'utilisateur
+  "personnalise" : [[0,4,7], "personnalisé"],
 };
 
 
@@ -688,10 +686,29 @@ const GM_SOUNDS={
 // Paramètre de synthèse WebAudio par prog GM
 // { osc: type|'karplus', env:{a,d,s,r}, harmonics:[{freq_mult,gain}], filter:{type,freq,q}, dur }
 function _gmSynthParams(prog){
-  // Guitares pincées → Karplus-Strong
-  if(prog>=24&&prog<=31) return{type:'karplus', sw:prog===24?8:prog===25?3:prog===28?1:2,
-    dk:[0.9995,0.9992,0.9988,0.9982], dur:prog===29||prog===30?2.5:1.5,
-    bright:prog>=26, bass:false};
+  // Guitares — chacune avec des paramètres vraiment distincts
+  if(prog===24) return{type:'karplus',                    // Guitare nylon : très doux, long sustain
+    sw:9, dk:[0.9994,0.9991,0.9987,0.9980], dur:2.2, bright:false, bass:false};
+  if(prog===25) return{type:'karplus',                    // Guitare acier : attaque vive, médiums
+    sw:3, dk:[0.9996,0.9993,0.9989,0.9983], dur:1.6, bright:false, bass:false};
+  if(prog===26) return{type:'karplus',                    // Jazz électrique : très doux, étouffé
+    sw:11, dk:[0.9990,0.9986,0.9980,0.9972], dur:1.2, bright:false, bass:false};
+  if(prog===27) return{type:'karplus',                    // Clean électrique : brillant, sustain moyen
+    sw:2, dk:[0.9997,0.9995,0.9991,0.9986], dur:2.0, bright:true, bass:false};
+  if(prog===28) return{type:'karplus',                    // Muted : très court, percussif
+    sw:1, dk:[0.9975,0.9965,0.9950,0.9930], dur:0.6, bright:false, bass:false, muted:true};
+  if(prog===29) return{type:'adsr', osc:'sawtooth',       // Overdrive : onde saw + distorsion douce
+    env:{a:0.008,d:0.1,s:0.75,r:0.15}, dur:2.5,
+    harmonics:[{m:2,g:0.35},{m:3,g:0.2},{m:4,g:0.1}],
+    filter:{type:'lowpass',freq:2800,q:1.5}};
+  if(prog===30) return{type:'adsr', osc:'sawtooth',       // Distortion : carré épais
+    env:{a:0.005,d:0.08,s:0.8,r:0.12}, dur:2.8,
+    harmonics:[{m:2,g:0.5},{m:3,g:0.3},{m:5,g:0.15}],
+    filter:{type:'lowpass',freq:2200,q:2.0}};
+  if(prog===31) return{type:'adsr', osc:'sine',           // Harmonics : très pur, cloche
+    env:{a:0.002,d:0.8,s:0.1,r:0.6}, dur:3.5,
+    harmonics:[{m:2,g:0.6},{m:4,g:0.25},{m:6,g:0.1}],
+    filter:null};
   // Basses → Karplus grave
   if(prog>=32&&prog<=39) return{type:'karplus', sw:prog===35?2:1,
     dk:[0.9997,0.9995,0.9992,0.9988], dur:2.0, bass:true,
@@ -734,8 +751,8 @@ function _gmSynthParams(prog){
 }
 
 // État son courant
-let _currentProg=25; // Guitare acier par défaut
-const TIMBRES=['Guitare acier']; // compatibilité state.timbre
+let _currentProg=24; // Guitare nylon par défaut
+const TIMBRES=['Guitare nylon']; // compatibilité state.timbre
 
 // ══════════════════════════════════════════════════════════════════
 // AUDIO ENGINE (WebAudio — fonctionne Android, iOS, Desktop)
@@ -754,13 +771,23 @@ function _karplusBuffer(ctx, freq, params, vol){
   const period=Math.max(2,Math.round(sr/freq));
   const nSamples=Math.round(sr*dur);
   let buf=[];
+
+  // Excitation selon le type
   if(p.slap){
+    // Basse slap : impulsion courte + silence
     for(let k=0;k<period;k++)buf.push(k<period*0.3?(Math.random()*2-1)*1.5:0);
+  } else if(p.bow){
+    // Archet : onde triangulaire
+    for(let k=0;k<period;k++)buf.push(k<period/2?(2*k/period-0.5):(1.5-2*k/period));
   } else {
+    // Pincé : bruit blanc
     for(let k=0;k<period;k++)buf.push(Math.random()*2-1);
   }
+
+  // Lissage (sw élevé = plus doux = nylon ; sw bas = plus brillant = acier)
   const sw=p.sw??3;
   for(let s=0;s<sw;s++)for(let k=0;k<period;k++)buf[k]=0.5*(buf[k]+buf[(k+1)%period]);
+
   const dk=p.dk||[0.9995,0.9992,0.9988,0.9982];
   const decay=freq<100?dk[0]:freq<200?dk[1]:freq<400?dk[2]:dk[3];
   const out=new Float32Array(nSamples);
@@ -768,11 +795,23 @@ function _karplusBuffer(ctx, freq, params, vol){
     const s=buf[i%period];out[i]=s;
     buf[i%period]=decay*0.5*(s+buf[(i+1)%period]);
   }
+
+  // Renforcement des hautes fréquences (guitare acier/électrique)
   if(p.bright)for(let i=1;i<out.length;i++)out[i]=out[i]*0.7+(out[i]-out[i-1])*0.45;
+
+  // Muted : atténuation rapide exponentielle
+  if(p.muted){
+    const tau=Math.round(sr*0.25);
+    for(let i=0;i<out.length;i++)out[i]*=Math.exp(-i/tau);
+  }
+
+  // Fade out final
   const fade=Math.max(1,Math.round(nSamples*0.08));
   for(let k=0;k<fade;k++)out[nSamples-fade+k]*=(1-k/fade);
+
   const gain=p.bass?(freq<120?2.2:freq<200?1.7:1.3):(freq<120?1.8:freq<200?1.4:1.15);
   for(let i=0;i<out.length;i++)out[i]=Math.max(-1,Math.min(1,out[i]*gain*vol));
+
   const audioBuf=ctx.createBuffer(1,nSamples,sr);
   audioBuf.getChannelData(0).set(out);
   return audioBuf;
@@ -857,10 +896,9 @@ let state={
   cnotes:[],
   invIndex:0,
   posMin:0,       // position minimale du doigté (0=open, 5=5e frette...)
-  voicingIdx:0,   // index de voicing (rotation des positions possibles)
   manualOverrides:{},
   colorMode:"full",
-  timbre:"Guitare acier",
+  timbre:"Guitare nylon",
   volume:0.3,
   geo:{}, // saved geometry for click detection
 };
@@ -875,7 +913,6 @@ function noteToMidi(s){
 }
 function midiToFreq(m){return 440*Math.pow(2,(m-69)/12)}
 function noteRole(note,root,ctype){
-  // Couleur par degré dans l'accord — même palette que gammes/modes
   if(!root||!ctype)return DEG_COLORS[6];
   const iv=CHORD_FORMULAS[ctype][0];
   const ri=NOTES.indexOf(root),ni=NOTES.indexOf(note);
@@ -884,6 +921,25 @@ function noteRole(note,root,ctype){
     if(iv[i]%12===interval)return DEG_COLORS[Math.min(i,DEG_COLORS.length-1)];
   }
   return DEG_COLORS[6];
+}
+
+// Nom du rôle basé sur l'intervalle réel en demi-tons (modulo 12)
+function intervalRoleName(semitones){
+  const s=((semitones%12)+12)%12;
+  return {
+    0:'1 — Fondamentale',
+    1:'b2 — Seconde diminuée',
+    2:'2 — Seconde',
+    3:'b3 — Tierce mineure',
+    4:'3 — Tierce majeure',
+    5:'4 — Quarte / 11e',
+    6:'b5 — Quinte diminuée',
+    7:'5 — Quinte',
+    8:'#5 — Quinte augmentée',
+    9:'6 — Sixte / 13e',
+    10:'b7 — Septième min.',
+    11:'7 — Septième maj.',
+  }[s]||'Extension';
 }
 function buildChord(root,ctype){
   const ri=NOTES.indexOf(root);
@@ -899,123 +955,41 @@ function getShortInfo(){
   return isBanjo5()?{0:shortStringFret()}:{};
 }
 // ══════════════════════════════════════════════════════════════════
-// BASE DE DONNÉES ACCORDS OUVERTS STANDARDS (guitare 6 cordes)
-// Format : [corde6(grave)..corde1(aigu)], -1=muette, 0=vide, n=frette
+// BASE DE DONNÉES ACCORDS — ouverts + barrés forme Mi + forme La
+// Format : [corde6..corde1], -1=muette, 0=vide, n=frette
+// Génération algorithmique des barrés : toutes les tonalités
 // ══════════════════════════════════════════════════════════════════
-const OPEN_CHORD_DB={
-  // Majeurs ouverts
-  "C-majeur":  [-1,3,2,0,1,0],
-  "D-majeur":  [-1,-1,0,2,3,2],
-  "E-majeur":  [0,2,2,1,0,0],
-  "F-majeur":  [1,3,3,2,1,1],   // barré 1
-  "G-majeur":  [3,2,0,0,0,3],
-  "A-majeur":  [-1,0,2,2,2,0],
-  "B-majeur":  [-1,2,4,4,4,2],  // barré 2
-  // Mineurs ouverts
-  "C-mineur":  [-1,3,5,5,4,3],  // barré 3
-  "D-mineur":  [-1,-1,0,2,3,1],
-  "E-mineur":  [0,2,2,0,0,0],
-  "F-mineur":  [1,3,3,1,1,1],   // barré 1
-  "G-mineur":  [3,5,5,3,3,3],   // barré 3
-  "A-mineur":  [-1,0,2,2,1,0],
-  "B-mineur":  [-1,2,4,4,3,2],  // barré 2
-  // 7e de dominante
-  "C-7":       [-1,3,2,3,1,0],
-  "D-7":       [-1,-1,0,2,1,2],
-  "E-7":       [0,2,0,1,0,0],
-  "F-7":       [1,3,1,2,1,1],
-  "G-7":       [3,2,0,0,0,1],
-  "A-7":       [-1,0,2,0,2,0],
-  "B-7":       [-1,2,1,2,0,2],
-  // Maj7
-  "C-maj7":    [-1,3,2,0,0,0],
-  "D-maj7":    [-1,-1,0,2,2,2],
-  "E-maj7":    [0,2,1,1,0,0],
-  "F-maj7":    [-1,-1,3,2,1,0],
-  "G-maj7":    [3,2,0,0,0,2],
-  "A-maj7":    [-1,0,2,1,2,0],
-  "B-maj7":    [-1,2,4,3,4,2],
-  // Min7
-  "C-min7":    [-1,3,1,0,1,0],  // alt: barré
-  "D-min7":    [-1,-1,0,2,1,1],
-  "E-min7":    [0,2,0,0,0,0],
-  "F-min7":    [1,3,1,1,1,1],
-  "G-min7":    [3,5,3,3,3,3],
-  "A-min7":    [-1,0,2,0,1,0],
-  "B-min7":    [-1,2,0,2,0,2],
-  // Sus2 et Sus4
-  "D-sus2":    [-1,-1,0,2,3,0],
-  "E-sus2":    [0,2,2,4,0,0],
-  "A-sus2":    [-1,0,2,2,0,0],
-  "G-sus2":    [3,0,0,0,1,3],
-  "D-sus4":    [-1,-1,0,2,3,3],
-  "E-sus4":    [0,2,2,2,0,0],
-  "A-sus4":    [-1,0,2,2,3,0],
-  "G-sus4":    [3,3,0,0,1,1],
-  // Accords add
-  "C-add9":    [-1,3,2,0,3,0],
-  "D-add9":    [-1,-1,0,2,3,0],
-  "G-add9":    [3,0,0,0,0,3],
-  "A-add9":    [-1,0,2,4,2,0],
-  // Power chords
-  "E-5":       [0,2,2,-1,-1,-1],
-  "A-5":       [-1,0,2,2,-1,-1],
-  "D-5":       [-1,-1,0,2,3,-1],
-  "G-5":       [3,5,5,-1,-1,-1],
-  // Diminués
-  "B-dim":     [-1,2,3,4,3,-1],
-  "E-dim":     [0,1,2,3,-1,-1],
-  // Augmentés
-  "E-aug":     [0,3,2,1,1,0],
-  "A-aug":     [-1,0,3,2,2,1],
-};
 
-// Convertit un accord DB en positions [si, fret, note]
-function _dbChordToPositions(frets, tuning, capo){
-  const positions=[];
-  for(let si=0;si<Math.min(frets.length,tuning.length);si++){
-    const f=frets[si];
-    if(f===-1)continue;
-    const midi=noteToMidi(tuning[si])+capo+f;
-    const note=NOTES[midi%12];
-    positions.push([si,f,note]);
-  }
-  return positions;
-}
+// ── Pas de DB statique — algorithme universel pour tous instruments ──
 
-function findPositions(tuning,chordNotes,capo,posMin=0,window=4){
+
+function findPositions(tuning,chordNotes,capo,posMin=0){
+  // Algorithme universel — fonctionne pour tous les instruments et accordages
+  // posMin=0 : frettes 0-4 (cordes à vide incluses)
+  // posMin=1 : frettes 1-4 (pas de corde à vide)
+  // posMin=N : frettes N à N+3
   const cs=new Set(chordNotes);
   const isB5fp=isBanjo5();
-
-  // ── 1. Chercher dans la base d'accords ouverts (guitare 6c, capo=0, posMin=0) ──
-  if(!isB5fp && tuning.length===6 && capo===0 && posMin===0 && state.rootNote){
-    const key=`${state.rootNote}-${state.ctype}`;
-    if(OPEN_CHORD_DB[key]){
-      const pos=_dbChordToPositions(OPEN_CHORD_DB[key], tuning, 0);
-      // Vérifier que toutes les notes de l'accord sont couvertes
-      const coveredNotes=new Set(pos.map(([,,n])=>n));
-      const allCovered=chordNotes.every(n=>coveredNotes.has(n));
-      if(allCovered) return pos;
-    }
-  }
-
-  // ── 2. Algorithme amélioré : score de jouabilité ──
-  const W=window||4;
   const result={};
 
-  function inWindow(f){ return f===0||(f>=posMin&&f<=posMin+W); }
+  // Fenêtre de frettes jouables
+  // Pos 0 : inclut les cordes à vide (f=0) + frettes 1-4
+  // Pos N>0 : frettes N à N+3 strictement (pas de corde à vide)
+  function inWindow(f){
+    if(posMin===0) return f===0||(f>=1&&f<=4);
+    return f>=posMin&&f<=posMin+3;
+  }
 
-  // Passe 1 : assigner chaque note de l'accord à la meilleure corde
-  // "meilleure" = frette la plus basse, préférence aux cordes à vide
+  // Passe 1 : une note → meilleure corde disponible dans la fenêtre
   for(const target of chordNotes){
     let best=null, bestScore=Infinity;
     for(let si=0;si<tuning.length;si++){
       if(result[si]!==undefined)continue;
       const om=(isB5fp&&si===0)?noteToMidi(tuning[si]):noteToMidi(tuning[si])+capo;
       for(let f=0;f<25;f++){
-        if(NOTES[(om+f)%12]===target&&inWindow(f)){
-          // Score : frette basse = bien, corde à vide = très bien
-          const score=f===0?-1:f;
+        if(!inWindow(f))continue;
+        if(NOTES[(om+f)%12]===target){
+          const score=f===0?-1:f;  // préférer cordes à vide
           if(score<bestScore){bestScore=score;best=[si,f,target];}
           break;
         }
@@ -1024,41 +998,26 @@ function findPositions(tuning,chordNotes,capo,posMin=0,window=4){
     if(best)result[best[0]]=[best[1],best[2]];
   }
 
-  // Passe 2 : cordes non assignées → note de l'accord la plus grave possible
+  // Passe 2 : cordes non assignées → toute note de l'accord dans la fenêtre
   for(let si=0;si<tuning.length;si++){
     if(result[si]!==undefined)continue;
     const om=(isB5fp&&si===0)?noteToMidi(tuning[si]):noteToMidi(tuning[si])+capo;
-    // Préférer les cordes à vide
-    for(let f=0;f<=posMin+W&&f<25;f++){
-      if(f>0&&f<posMin)continue;
+    for(let f=0;f<25;f++){
+      if(!inWindow(f))continue;
       const note=NOTES[(om+f)%12];
       if(cs.has(note)){result[si]=[f,note];break;}
     }
-    // Fallback global
-    if(result[si]===undefined){
-      for(let f=0;f<25;f++){
-        const note=NOTES[(om+f)%12];
-        if(cs.has(note)){result[si]=[f,note];break;}
-      }
-    }
   }
 
-  // ── 3. Post-traitement : muter les cordes graves qui cassent la jouabilité ──
-  // Si une corde grave a une frette très haute alors que les autres sont basses,
-  // la muter est plus jouable
+  // Post-traitement : muter cordes trop éloignées du centre de la fenêtre
   const positions=Object.entries(result).sort((a,b)=>+a[0]-+b[0]).map(([si,[f,n]])=>[+si,f,n]);
-  if(positions.length>0&&posMin===0){
-    const frets=positions.filter(([,f])=>f>0).map(([,f])=>f);
-    if(frets.length>0){
-      const maxF=Math.max(...frets);
-      const minF=Math.min(...frets.filter(f=>f>0));
-      // Si l'écart est > 4 frettes, muter la corde la plus problématique
+  if(positions.length>0){
+    const activeFrets=positions.map(([,f])=>f).filter(f=>f>0);
+    if(activeFrets.length>1){
+      const maxF=Math.max(...activeFrets), minF=Math.min(...activeFrets);
       if(maxF-minF>4){
         const outlier=positions.find(([,f])=>f===maxF);
-        if(outlier){
-          const [outSi]=outlier;
-          delete result[outSi];
-        }
+        if(outlier){delete result[outlier[0]];}
       }
     }
   }
@@ -1124,11 +1083,33 @@ function initSelects(){
   // Root
   const rSel=document.getElementById('root-sel');
   const ro=document.createElement('option');ro.value='';ro.textContent='— Aucun accord —';rSel.appendChild(ro);
-  NOTES.forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=`${n} (${NOTES_FR[n]})`;rSel.appendChild(o);});
+  NOTES.forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;rSel.appendChild(o);});
 
-  // Chord type
+  // Chord type — Personnalisé en premier, puis groupes standards
   const ctSel=document.getElementById('ctype-sel');
-  Object.keys(CHORD_FORMULAS).forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=k;ctSel.appendChild(o);});
+  // Option personnalisée en tête
+  const ogCust=document.createElement('optgroup');ogCust.label='── Personnalisé ──';
+  const oCust=document.createElement('option');
+  oCust.value='personnalise';oCust.textContent='✎ Personnalisé…';
+  ogCust.appendChild(oCust);ctSel.appendChild(ogCust);
+  // Groupes standards
+  const _chordGroups=[
+    ["Triades",  ["majeur","mineur","5","dim","aug","sus2","sus4"]],
+    ["6e",       ["6","min6","6/9","min6/9"]],
+    ["7e",       ["7","maj7","min7","minmaj7","dim7","min7b5","7b5","7#5","aug7","augmaj7","7sus4"]],
+    ["7 alt",    ["7b9","7#9","7#11","7b9b5","7b9#5","7#9b5","7#9#5","7b9#11","7#9#11","7alt"]],
+    ["add",      ["add9","madd9","add11"]],
+    ["9e",       ["9","maj9","min9","minmaj9","9b5","9#5","9#11","9sus4","dim9"]],
+    ["11e",      ["11","maj11","min11"]],
+    ["13e",      ["13","maj13","min13","13b9","13#9","13#11","13sus4"]],
+  ];
+  for(const[grp,keys] of _chordGroups){
+    const og=document.createElement('optgroup');og.label=grp;
+    for(const k of keys){
+      const o=document.createElement('option');o.value=k;o.textContent=k;og.appendChild(o);
+    }
+    ctSel.appendChild(og);
+  }
   ctSel.value='majeur';
 
   // Scale
@@ -1256,14 +1237,76 @@ document.getElementById('root-sel').addEventListener('change',e=>{
   state.rootNote=e.target.value||null;
   state.invIndex=0;
   state.posMin=0;
-  state.voicingIdx=0;
+  // Rafraîchir les noms de notes dans le builder personnalisé
+  if(state.ctype==='personnalise') initCustomChordBuilder();
   computeAndDraw();
 });
+// ── Accord personnalisé ──
+// Les intervalles cochés par l'utilisateur (toujours inclut 0 = fondamentale)
+let _customIntervals = new Set([0,4,7]); // majeur par défaut
+
+function initCustomChordBuilder(){
+  const el=document.getElementById('custom-degree-checks');
+  if(!el)return;
+  el.innerHTML='';
+  const degrees=buildDegrees(state.rootNote);
+  degrees.forEach(({iv,name,col,label})=>{
+    const row=document.createElement('label');
+    row.style.cssText=`display:flex;align-items:center;gap:6px;font-size:10px;
+      font-family:'JetBrains Mono',monospace;color:${col};cursor:pointer;padding:2px 0;`;
+    const chk=document.createElement('input');
+    chk.type='checkbox';
+    chk.checked=_customIntervals.has(iv);
+    chk.disabled=(iv===0);
+    chk.style.cssText='accent-color:'+col+';min-width:14px;min-height:14px;';
+
+    const noteStr=label(iv);
+    const noteLbl=document.createElement('span');
+    noteLbl.style.cssText=`min-width:22px;font-weight:bold;font-size:9px;`;
+    noteLbl.textContent=noteStr;
+
+    const nameLbl=document.createElement('span');
+    nameLbl.textContent=name;
+
+    row.appendChild(chk);row.appendChild(noteLbl);row.appendChild(nameLbl);
+    el.appendChild(row);
+
+    chk.addEventListener('change',()=>{
+      if(iv===0)return;
+      if(chk.checked) _customIntervals.add(iv);
+      else _customIntervals.delete(iv);
+      const ivSorted=[..._customIntervals].sort((a,b)=>a-b);
+      CHORD_FORMULAS['personnalise'][0]=ivSorted;
+      state.ctype='personnalise';
+      state.cnotes=buildChord(state.rootNote,state.ctype);
+      state.invIndex=0;state.posMin=0;
+      computeAndDraw();
+    });
+  });
+}
+
+function showCustomBuilder(visible){
+  const el=document.getElementById('custom-chord-builder');
+  if(el) el.style.display=visible?'block':'none';
+}
+
 document.getElementById('ctype-sel').addEventListener('change',e=>{
-  state.ctype=e.target.value;
+  const val=e.target.value;
+  if(val==='personnalise'){
+    showCustomBuilder(true);
+    // Initialiser avec les intervalles actuels si on vient d'un accord standard
+    if(state.ctype!=='personnalise'&&CHORD_FORMULAS[state.ctype]){
+      _customIntervals=new Set(CHORD_FORMULAS[state.ctype][0].map(iv=>iv%12));
+      _customIntervals.add(0);
+      CHORD_FORMULAS['personnalise'][0]=[..._customIntervals].sort((a,b)=>a-b);
+    }
+    initCustomChordBuilder();
+  } else {
+    showCustomBuilder(false);
+  }
+  state.ctype=val;
   state.invIndex=0;
   state.posMin=0;
-  state.voicingIdx=0;
   computeAndDraw();
 });
 document.getElementById('scale-sel').addEventListener('change',e=>{
@@ -1481,7 +1524,7 @@ function computeAndDraw(){
 function updateStatus(){
   const sb=document.getElementById('statusbar');
   const capoStr=state.capo>0?`  Capo ${state.capo}`:'';
-  const chordStr=state.rootNote?`${NOTES_FR[state.rootNote]||state.rootNote} ${state.ctype.toUpperCase()}`:'— cordes à vide —';
+  const chordStr=state.rootNote?`${state.rootNote} ${state.ctype.toUpperCase()}`:'— cordes à vide —';
   const invNames=['','  (1er renvers.)','  (2e renvers.)','  (3e renvers.)'];
   const invS=state.invIndex===0?'':invNames[state.invIndex]||`  (${state.invIndex}e renvers.)`;
   sb.textContent=`  ${state.instrument}${capoStr}  |  ${chordStr}${invS}`;
@@ -1492,25 +1535,81 @@ function updateStatus(){
 // ══════════════════════════════════════════════════════════════════
 function updateNotesPanel(notes){}  // section composition supprimée
 
-function updateChordLegend(){
-  const el=document.getElementById('legend-chord-notes');
+// Tous les degrés possibles avec leur couleur
+// Degrés : génération des noms avec la note réelle relative à la fondamentale
+// Pour les degrés altérés, on montre "bX" ou "#X" avec X = note naturelle du degré
+function buildDegrees(rootNote){
+  const ri = rootNote ? NOTES.indexOf(rootNote) : null;
+  function n(semis){ return ri!==null ? NOTES[(ri+semis)%12] : ''; }
+  // La note affichée est simplement la note chromatique de l'intervalle
+  // Ex: pour Am, b3 (iv=3) → NOTES[(9+3)%12] = C ✓ (pas C#b)
+  return [
+    {iv:0,  col:'#FF3300', label: () => n(0),  name:'Fondamentale'},
+    {iv:1,  col:'#FF6600', label: () => n(1),  name:'b2 — Seconde dim.'},
+    {iv:2,  col:'#FF8800', label: () => n(2),  name:'2 — Seconde'},
+    {iv:3,  col:'#FFAA00', label: () => n(3),  name:'b3 — Tierce min.'},
+    {iv:4,  col:'#22CC44', label: () => n(4),  name:'3 — Tierce maj.'},
+    {iv:5,  col:'#00CCCC', label: () => n(5),  name:'4 — Quarte / 11e'},
+    {iv:6,  col:'#0099AA', label: () => n(6),  name:'b5 — Quinte dim.'},
+    {iv:7,  col:'#3399FF', label: () => n(7),  name:'5 — Quinte'},
+    {iv:8,  col:'#6666FF', label: () => n(8),  name:'#5 — Quinte aug.'},
+    {iv:9,  col:'#AA44FF', label: () => n(9),  name:'6 — Sixte / 13e'},
+    {iv:10, col:'#CC44AA', label: () => n(10), name:'b7 — Sept. min.'},
+    {iv:11, col:'#FFD700', label: () => n(11), name:'7 — Sept. maj.'},
+  ];
+}
+
+// Version statique pour les endroits qui n'ont pas de root
+const ALL_DEGREES=buildDegrees(null).map(d=>({iv:d.iv,name:d.name,col:d.col}));
+
+function updateDegreeChecks(){
+  const el=document.getElementById('degree-checks');
   if(!el)return;
-  if(!state.rootNote||!state.cnotes||!state.cnotes.length){
-    el.innerHTML=`
-      <div class="legend-row"><div class="legend-dot" style="background:var(--root)"></div><span class="legend-txt">Fondamentale</span></div>
-      <div class="legend-row"><div class="legend-dot" style="background:var(--third)"></div><span class="legend-txt">Tierce</span></div>
-      <div class="legend-row"><div class="legend-dot" style="background:var(--fifth)"></div><span class="legend-txt">Quinte</span></div>
-      <div class="legend-row"><div class="legend-dot" style="background:var(--other)"></div><span class="legend-txt">Extension</span></div>`;
-    return;
+
+  const presentIvs=new Set();
+  if(state.rootNote&&state.ctype&&CHORD_FORMULAS[state.ctype]){
+    CHORD_FORMULAS[state.ctype][0].forEach(iv=>presentIvs.add(iv%12));
   }
-  const roleNames=['1 — Fondamentale','2e / 9e','3 — Tierce','4e / 11e','5 — Quinte','6e / 13e','7e'];
-  const html=state.cnotes.map((note,i)=>{
-    const col=noteRole(note,state.rootNote,state.ctype);
-    const fr=NOTES_FR[note]||note;
-    const role=roleNames[Math.min(i,roleNames.length-1)]||'Extension';
-    return `<div class="legend-row"><div class="legend-dot" style="background:${col}"></div><span class="legend-txt"><b style="color:${col}">${fr}</b> — ${role}</span></div>`;
-  }).join('');
-  el.innerHTML=html;
+
+  el.innerHTML='';
+  const degrees=buildDegrees(state.rootNote);
+
+  degrees.forEach(({iv,name,col,label})=>{
+    const present=presentIvs.has(iv);
+    // Note toujours affichée, même si absent
+    const noteStr=label(iv);
+
+    const row=document.createElement('div');
+    row.style.cssText=`display:flex;align-items:center;gap:5px;
+      padding:1px 2px;border-radius:3px;
+      opacity:${present?1:0.3};`;
+
+    const dot=document.createElement('div');
+    dot.style.cssText=`width:9px;height:9px;border-radius:50%;flex-shrink:0;
+      background:${present?col:'transparent'};
+      border:1.5px solid ${col};`;
+
+    const noteLbl=document.createElement('span');
+    noteLbl.style.cssText=`font-family:'JetBrains Mono',monospace;font-size:9px;
+      font-weight:bold;color:${col};min-width:22px;`;
+    noteLbl.textContent=noteStr;
+
+    const degLbl=document.createElement('span');
+    degLbl.style.cssText=`font-family:'JetBrains Mono',monospace;font-size:9px;
+      color:${present?col:'var(--muted)'};`;
+    degLbl.textContent=name;
+
+    row.appendChild(dot);row.appendChild(noteLbl);row.appendChild(degLbl);
+    el.appendChild(row);
+  });
+}
+
+function updateChordLegend(){
+  // legacy — maintenant géré par updateDegreeChecks
+  updateDegreeChecks();
+  // Garder l'id pour compatibilité
+  const el=document.getElementById('legend-chord-notes');
+  if(el)el.innerHTML='';
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -1531,7 +1630,7 @@ function updateInversions(){
     const btn=document.createElement('button');
     btn.className='inv-btn'+(isActive?' active':'');
 
-    const notesStr=inv.map(n=>NOTES_FR[n]||n).join(' - ');
+    const notesStr=inv.join(' - ');
     btn.innerHTML=`<span class="inv-play">▶</span><span class="inv-name">${name}</span><span class="inv-notes">${notesStr}</span>`;
     btn.querySelector('.inv-play').addEventListener('click',ev=>{ev.stopPropagation();playInversion(inv);});
     btn.addEventListener('click',()=>applyInversion(i));
@@ -1543,29 +1642,47 @@ function applyInversion(invIndex){
   if(!state.cnotes.length||!state.rootNote||state.instrument==='Aucun')return;
   state.invIndex=invIndex;
   const inv=state.cnotes.slice(invIndex).concat(state.cnotes.slice(0,invIndex));
+  const capo=state.capo;
   const newPositions=[];
   const usedStrings=new Set();
-  // Bass note on lowest available string
+
+  // Note de basse : corde la plus grave, frette la plus basse dans window 4
   const bassNote=inv[0];
   for(let si=0;si<state.tuning.length;si++){
-    if(usedStrings.has(si))continue;
-    const om=noteToMidi(state.tuning[si]);
-    for(let f=0;f<25;f++){
-      if(NOTES[(om+f)%12]===bassNote){newPositions.push([si,f,bassNote]);usedStrings.add(si);break;}
+    const om=noteToMidi(state.tuning[si])+capo;
+    for(let f=0;f<5;f++){
+      if(NOTES[(om+f)%12]===bassNote){
+        newPositions.push([si,f,bassNote]);
+        usedStrings.add(si);
+        break;
+      }
     }
     if(usedStrings.has(si))break;
   }
-  // Other notes
+
+  // Frette de référence pour la window
+  const bassF=newPositions.length>0?newPositions[0][1]:0;
+  const winMin=bassF===0?0:bassF;
+  const winMax=winMin+4;
+
+  // Autres notes : dans la window autour de la basse
   for(const note of inv.slice(1)){
     for(let si=0;si<state.tuning.length;si++){
       if(usedStrings.has(si))continue;
-      const om=noteToMidi(state.tuning[si]);
-      for(let f=0;f<25;f++){
-        if(NOTES[(om+f)%12]===note){newPositions.push([si,f,note]);usedStrings.add(si);break;}
+      const om=noteToMidi(state.tuning[si])+capo;
+      for(let f=0;f<=24;f++){
+        if(NOTES[(om+f)%12]===note){
+          if(f===0||((winMin===0&&f<=winMax)||f>=winMin&&f<=winMax)){
+            newPositions.push([si,f,note]);
+            usedStrings.add(si);
+            break;
+          }
+        }
       }
       if(usedStrings.has(si))break;
     }
   }
+
   newPositions.sort((a,b)=>a[0]-b[0]);
   state.positions=newPositions;
   state.manualOverrides={};
@@ -1577,14 +1694,20 @@ function applyInversion(invIndex){
 
 function playInversion(inv){
   if(state.instrument==='Aucun')return;
+  const capo=state.capo;
   const midi=[];
+  const usedStrings=new Set();
   for(const note of inv){
     for(let si=0;si<state.tuning.length;si++){
-      const om=noteToMidi(state.tuning[si]);
+      if(usedStrings.has(si))continue;
+      const om=noteToMidi(state.tuning[si])+capo;
       for(let f=0;f<25;f++){
-        if(NOTES[(om+f)%12]===note){midi.push(om+f);break;}
+        if(NOTES[(om+f)%12]===note){
+          midi.push(om+f);
+          usedStrings.add(si);
+          break;
+        }
       }
-      if(midi.length===inv.indexOf(note)+1)break;
     }
   }
   if(midi.length)playMidiNotes(midi,70);
@@ -1603,54 +1726,23 @@ document.querySelectorAll('input[name=vis-mobile]').forEach(r=>{
 });
 
 function resetChord(){
-  document.getElementById('root-sel').value='';
-  state.rootNote=null;
+  state.manualOverrides={};
   state.invIndex=0;
   state.posMin=0;
-  state.voicingIdx=0;
-  state.manualOverrides={};
   updatePosLabels();
   computeAndDraw();
 }
 
 function updatePosLabels(){
   const pl=document.getElementById('pos-min-lbl');
-  const vl=document.getElementById('voicing-lbl');
-  if(pl)pl.textContent=state.posMin||'0';
-  if(vl)vl.textContent=(state.voicingIdx+1);
+  if(pl)pl.textContent=state.posMin||0;
 }
 
 function changePosMin(delta){
   state.posMin=Math.max(0,Math.min(18,(state.posMin||0)+delta));
-  state.voicingIdx=0;
   state.manualOverrides={};
   updatePosLabels();
   computeAndDraw();
-}
-
-function changeVoicing(delta){
-  if(!state.cnotes||!state.cnotes.length)return;
-  // Générer tous les voicings possibles à posMin en essayant différentes fenêtres
-  const voicings=[];
-  for(let w=3;w<=6;w++){
-    const pos=findPositions(state.tuning,state.cnotes,state.capo,state.posMin,w);
-    const key=pos.map(([s,f])=>s+','+f).join('|');
-    if(!voicings.find(v=>v.key===key))voicings.push({key,pos});
-  }
-  // Aussi essayer les positions décalées de 1-2 frettes
-  for(let off=1;off<=3;off++){
-    for(let w=3;w<=5;w++){
-      const pos=findPositions(state.tuning,state.cnotes,state.capo,(state.posMin||0)+off,w);
-      const key=pos.map(([s,f])=>s+','+f).join('|');
-      if(!voicings.find(v=>v.key===key))voicings.push({key,pos});
-    }
-  }
-  state.voicingIdx=((state.voicingIdx||0)+delta+voicings.length)%voicings.length;
-  state.manualOverrides={};
-  const chosen=voicings[state.voicingIdx];
-  state.positions=chosen.pos;
-  document.getElementById('voicing-lbl').textContent=(state.voicingIdx+1)+'/'+voicings.length;
-  draw();
 }
 
 let arpDir=1; // 1=montant, -1=descendant
@@ -1794,7 +1886,7 @@ function drawStrings(ctx,g,tuning,dbl,thicknesses){
     const noteCol=isShort?'#c8a050':isDbl?'#e8d080':'#e8e8f0';
     const fntStr=g.small?'bold 7px JetBrains Mono,monospace':'bold 9px JetBrains Mono,monospace';
     ctx.fillStyle=noteCol;ctx.font=fntStr;
-    ctx.textAlign='left';ctx.fillText(NOTES_FR[realNote]||realNote,ML-45,y+3);
+    ctx.textAlign='left';ctx.fillText(realNote,ML-45,y+3);
     if(isShort){
       ctx.fillStyle='#876030';ctx.font=g.small?'6px JetBrains Mono,monospace':'7px JetBrains Mono,monospace';
       ctx.textAlign='left';ctx.fillText('(5fr)',ML-50,y+12);
@@ -1816,7 +1908,7 @@ function draw(){
     if(state.rootNote){
       ctx.fillStyle='#00d4ff';ctx.font='bold 20px Space Grotesk,sans-serif';
       ctx.textAlign='center';
-      ctx.fillText(`${NOTES_FR[state.rootNote]||state.rootNote} ${state.ctype.toUpperCase()}`,W/2,H/2-40);
+      ctx.fillText(`${state.rootNote} ${state.ctype.toUpperCase()}`,W/2,H/2-40);
     }
     return;
   }
@@ -1831,7 +1923,7 @@ function draw(){
 
   const invNames=['','  (1er renvers.)','  (2e renvers.)','  (3e renvers.)'];
   const invSuffix=state.invIndex===0?'':invNames[state.invIndex]||`  (${state.invIndex}e renvers.)`;
-  const chordLbl=state.rootNote?`${NOTES_FR[state.rootNote]||state.rootNote} ${state.ctype.toUpperCase()}${invSuffix}`:'— cordes à vide —';
+  const chordLbl=state.rootNote?`${state.rootNote} ${state.ctype.toUpperCase()}${invSuffix}`:'— cordes à vide —';
 
   drawFretboardBase(ctx,W,H,g,null,capo);
 
@@ -1853,7 +1945,7 @@ function draw(){
 
   const rDotBase=g.small?5:7;
   const rDot=Math.min(Math.max(fw*0.38,rDotBase),sg*0.38,g.small?12:18);
-  const rSmall=Math.max(g.small?3:5,rDot*0.52);
+  const rSmall=Math.max(g.small?4:6,rDot*0.72);  // plus grand : 72% au lieu de 52%
   const dotFnt=g.small?'5px JetBrains Mono,monospace':'7px JetBrains Mono,monospace';
   const dotFntB=g.small?'bold 5px JetBrains Mono,monospace':'bold 7px JetBrains Mono,monospace';
   const posMap={};state.positions.forEach(([si,f,n])=>posMap[si]=[f,n]);
@@ -1877,10 +1969,10 @@ function draw(){
       const col=noteRole(note,state.rootNote,state.ctype);
       const colDim=dimCols[col]||'#555';
       const xd=f===0?sx(voffDim):sx(f+voffDim-0.5);
-      ctx.strokeStyle=col;ctx.lineWidth=0.8;ctx.fillStyle=colDim;
+      ctx.strokeStyle=col;ctx.lineWidth=1;ctx.fillStyle=colDim;
       ctx.beginPath();ctx.arc(xd,y,rSmall,0,Math.PI*2);ctx.fill();ctx.stroke();
-      ctx.fillStyle=col;ctx.font='bold 6px JetBrains Mono,monospace';
-      ctx.textAlign='center';ctx.fillText(NOTES_FR[note]||note,xd,y+2);
+      ctx.fillStyle=col;ctx.font=`bold 7px JetBrains Mono,monospace`;
+      ctx.textAlign='center';ctx.fillText(note,xd,y+2);
     }
   }
 
@@ -1982,7 +2074,7 @@ function draw(){
       ctx.beginPath();ctx.arc(x2,y,r2,0,Math.PI*2);
       if(capo===0&&!isRoot){ctx.stroke();}else{ctx.fill();ctx.stroke();}
       ctx.fillStyle=(isRoot||capo>0)?'#fff':dotCol;ctx.font=dotFntB;
-      ctx.textAlign='center';ctx.fillText(NOTES_FR[note]||note,x2,y+2);
+      ctx.textAlign='center';ctx.fillText(note,x2,y+2);
     } else if(fret+voffM<=nFrets){
       // Position visuelle = fret musical + offset visuel
       const xd=fret===0?sx(voffM):sx(fret+voffM-0.5);
@@ -1994,7 +2086,7 @@ function draw(){
       ctx.beginPath();ctx.arc(xd,y,rd,0,Math.PI*2);ctx.stroke();
       ctx.fillStyle=isRoot?'#fff':'#000';
       ctx.font=isRoot?dotFntB:dotFnt;
-      ctx.textAlign='center';ctx.fillText(NOTES_FR[note]||note,xd,y+2);
+      ctx.textAlign='center';ctx.fillText(note,xd,y+2);
     }
   }
 }
@@ -2028,7 +2120,7 @@ function drawFretboardGeneric(id,title,intervals,rootNote){
 
   drawFretboardBase(ctx,W,H,g,null,capo);
 
-  const lbl=`${NOTES_FR[rootNote]||rootNote} — ${title}${capo>0?`  [Capo ${capo}]`:''}`;
+  const lbl=`${rootNote} — ${title}${capo>0?`  [Capo ${capo}]`:''}`;
   const gtSz=g.small?'bold 10px':'bold 13px';
   const gsSz=g.small?'bold 9px':'bold 12px';
   ctx.fillStyle='#00d4ff';ctx.font=`${gtSz} Space Grotesk,sans-serif`;
@@ -2066,7 +2158,7 @@ function drawFretboardGeneric(id,title,intervals,rootNote){
       ctx.beginPath();ctx.arc(xOp,y,r2,0,Math.PI*2);ctx.fill();
       ctx.strokeStyle=isRoot?'#fff':isWhite?'#888':'#222';ctx.lineWidth=1;
       ctx.beginPath();ctx.arc(xOp,y,r2,0,Math.PI*2);ctx.stroke();
-      const noteLbl=NOTES_FR[NOTES[openNI]]||NOTES[openNI];
+      const noteLbl=NOTES[openNI];
       ctx.fillStyle=isWhite?'#000':isRoot?'#fff':'#000';
       ctx.font=dotFntB;
       ctx.textAlign='center';ctx.fillText(noteLbl,xOp,y+2);
@@ -2088,7 +2180,7 @@ function drawFretboardGeneric(id,title,intervals,rootNote){
       ctx.beginPath();ctx.arc(xd,y,rDot,0,Math.PI*2);ctx.fill();
       ctx.strokeStyle=isRoot?'#fff':isWhite?'#888':'#222';ctx.lineWidth=1;
       ctx.beginPath();ctx.arc(xd,y,rDot,0,Math.PI*2);ctx.stroke();
-      const noteLbl=NOTES_FR[NOTES[ni]]||NOTES[ni];
+      const noteLbl=NOTES[ni];
       ctx.fillStyle=isWhite?'#000':isRoot?'#fff':'#000';
       ctx.font=dotFntB;
       ctx.textAlign='center';ctx.fillText(noteLbl,xd,y+2);
