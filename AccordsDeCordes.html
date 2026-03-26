@@ -128,21 +128,6 @@ select:focus{border-color:var(--accent)}
 }
 .chord-note .role{font-size:9px;opacity:.7;font-weight:400}
 
-.inv-list{display:flex;flex-direction:column;gap:3px;margin-top:4px}
-.inv-btn{
-  display:flex;align-items:center;gap:6px;
-  padding:5px 8px;border-radius:5px;border:1px solid var(--border);
-  cursor:pointer;transition:all .15s;background:transparent;
-  text-align:left;font-family:inherit;
-  touch-action:manipulation;min-height:36px;
-}
-.inv-btn:hover{background:var(--panel2)}
-.inv-btn.active{background:#0d2a0d;border-color:#2a6a2a}
-.inv-btn .inv-name{font-size:10px;font-weight:600;color:var(--muted);flex:1;font-family:'JetBrains Mono',monospace}
-.inv-btn.active .inv-name{color:var(--open)}
-.inv-btn .inv-notes{font-size:9px;color:var(--muted)}
-.inv-play{font-size:9px;color:var(--open);cursor:pointer}
-.inv-btn.active .inv-play{color:var(--open)}
 
 .vis-checks{display:flex;flex-direction:column;gap:4px;margin-top:4px}
 .vis-check{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;font-weight:600;
@@ -378,14 +363,6 @@ select option{background:#1a1a2c}
           <select id="mode-sel" style="width:100%"></select>
         </div>
       </div>
-
-      <!-- RENVERSEMENTS -->
-      <div class="section">
-        <div class="section-hdr closed" data-section="inv"><span class="arrow">▼</span> RENVERSEMENTS</div>
-        <div class="section-body hidden" id="sect-inv">
-          <div style="font-size:10px;color:var(--muted);font-style:italic;margin-bottom:4px">Cliquer pour appliquer au manche</div>
-          <div id="inv-list" class="inv-list"></div>
-        </div>
       </div>
 
       <!-- VISIBILITÉ -->
@@ -446,9 +423,9 @@ select option{background:#1a1a2c}
           <span>● ACCORD</span>
           <button onclick="resetChord()" title="Réinitialiser l'accord" style="background:transparent;border:1px solid #334;color:#6688aa;font-family:'JetBrains Mono',monospace;font-size:9px;padding:2px 7px;border-radius:4px;cursor:pointer;touch-action:manipulation" onmouseover="this.style.borderColor='#00d4ff'" onmouseout="this.style.borderColor='#334'">↺ reset</button>
           <span style="color:#555;font-size:9px">|</span>
-          <span style="font-size:9px;color:#88aaff;font-family:'JetBrains Mono',monospace">Pos:</span>
+          <span style="font-size:9px;color:#88aaff;font-family:'JetBrains Mono',monospace">Position:</span>
           <button onclick="changePosMin(-1)" style="background:#0d1526;border:1px solid #334;color:#88aaff;font-family:'JetBrains Mono',monospace;font-size:11px;width:22px;height:22px;border-radius:3px;cursor:pointer;touch-action:manipulation;padding:0;line-height:1">◀</button>
-          <span id="pos-min-lbl" style="font-size:11px;color:#00d4ff;font-family:'JetBrains Mono',monospace;min-width:20px;text-align:center">0</span>
+          <span id="pos-min-lbl" style="font-size:11px;color:#00d4ff;font-family:'JetBrains Mono',monospace;min-width:20px;text-align:center">1</span>
           <button onclick="changePosMin(1)" style="background:#0d1526;border:1px solid #334;color:#88aaff;font-family:'JetBrains Mono',monospace;font-size:11px;width:22px;height:22px;border-radius:3px;cursor:pointer;touch-action:manipulation;padding:0;line-height:1">▶</button>
         </div>
         <div class="neck-scroll" id="scroll-cv-accord"><canvas id="cv-accord"></canvas></div>
@@ -894,8 +871,7 @@ let state={
   capo:0,
   positions:[],
   cnotes:[],
-  invIndex:0,
-  posMin:0,       // position minimale du doigté (0=open, 5=5e frette...)
+  posMin:1,       // position minimale (1=position ouverte, 2=frettes 2-5...)
   manualOverrides:{},
   colorMode:"full",
   timbre:"Guitare nylon",
@@ -963,25 +939,26 @@ function getShortInfo(){
 // ── Pas de DB statique — algorithme universel pour tous instruments ──
 
 
-function findPositions(tuning,chordNotes,capo,posMin=0){
+function findPositions(tuning,chordNotes,capo,posMin=1){
   // Algorithme universel — fonctionne pour tous les instruments et accordages
-  // posMin=0 : frettes 0-4 (cordes à vide incluses)
-  // posMin=1 : frettes 1-4 (pas de corde à vide)
-  // posMin=N : frettes N à N+3
+  // posMin=1 : frettes 1-4 + cordes à vide
+  // posMin=N : frettes N à N+3 + cordes à vide (toujours)
   const cs=new Set(chordNotes);
   const isB5fp=isBanjo5();
   const result={};
 
-  // Fenêtre de frettes jouables
-  // Pos 0 : inclut les cordes à vide (f=0) + frettes 1-4
-  // Pos N>0 : frettes N à N+3 strictement (pas de corde à vide)
+  // Cordes à vide (f=0) : toujours autorisées quelle que soit la position
+  // Frettes : fenêtre de 4 frettes à partir de posMin (min 1)
   function inWindow(f){
-    if(posMin===0) return f===0||(f>=1&&f<=4);
+    if(f===0) return true;  // corde à vide : toujours OK
     return f>=posMin&&f<=posMin+3;
   }
 
-  // Passe 1 : une note → meilleure corde disponible dans la fenêtre
-  for(const target of chordNotes){
+  // Passe 1 : assigner chaque note à la meilleure corde dans la fenêtre
+  // Ordre : fondamentale d'abord (pour qu'elle prenne la corde grave idéale)
+  const rootNote=chordNotes[0];
+  const orderedNotes=[rootNote,...chordNotes.slice(1)];
+  for(const target of orderedNotes){
     let best=null, bestScore=Infinity;
     for(let si=0;si<tuning.length;si++){
       if(result[si]!==undefined)continue;
@@ -989,7 +966,9 @@ function findPositions(tuning,chordNotes,capo,posMin=0){
       for(let f=0;f<25;f++){
         if(!inWindow(f))continue;
         if(NOTES[(om+f)%12]===target){
-          const score=f===0?-1:f;  // préférer cordes à vide
+          // Score : corde à vide = très bien (-1), frette basse = bien
+          // Bonus corde grave pour la fondamentale (si bas dans le manche)
+          const score=f===0?-1:f;
           if(score<bestScore){bestScore=score;best=[si,f,target];}
           break;
         }
@@ -1235,8 +1214,7 @@ document.getElementById('capo-sel').addEventListener('change',e=>{
 });
 document.getElementById('root-sel').addEventListener('change',e=>{
   state.rootNote=e.target.value||null;
-  state.invIndex=0;
-  state.posMin=0;
+  state.posMin=1;
   // Rafraîchir les noms de notes dans le builder personnalisé
   if(state.ctype==='personnalise') initCustomChordBuilder();
   computeAndDraw();
@@ -1278,8 +1256,7 @@ function initCustomChordBuilder(){
       const ivSorted=[..._customIntervals].sort((a,b)=>a-b);
       CHORD_FORMULAS['personnalise'][0]=ivSorted;
       state.ctype='personnalise';
-      state.cnotes=buildChord(state.rootNote,state.ctype);
-      state.invIndex=0;state.posMin=0;
+      state.cnotes=buildChord(state.rootNote,state.ctype);state.posMin=1;
       computeAndDraw();
     });
   });
@@ -1305,8 +1282,7 @@ document.getElementById('ctype-sel').addEventListener('change',e=>{
     showCustomBuilder(false);
   }
   state.ctype=val;
-  state.invIndex=0;
-  state.posMin=0;
+  state.posMin=1;
   computeAndDraw();
 });
 document.getElementById('scale-sel').addEventListener('change',e=>{
@@ -1481,12 +1457,10 @@ function applyOverridesAndRefresh(){
 // COMPUTE & DRAW
 // ══════════════════════════════════════════════════════════════════
 function computeAndDraw(){
-  state.invIndex=0;
   state.manualOverrides={};
   if(state.instrument==='Aucun'||!state.tuning.length){
     state.positions=[];
     state.cnotes=state.rootNote?buildChord(state.rootNote,state.ctype):[];
-      updateInversions();
     drawAll();
     updateStatus();
     return;
@@ -1514,7 +1488,6 @@ function computeAndDraw(){
       }
     }
   }
-  updateInversions();
   updatePosLabels();
   updateChordLegend();
   drawAll();
@@ -1525,9 +1498,7 @@ function updateStatus(){
   const sb=document.getElementById('statusbar');
   const capoStr=state.capo>0?`  Capo ${state.capo}`:'';
   const chordStr=state.rootNote?`${state.rootNote} ${state.ctype.toUpperCase()}`:'— cordes à vide —';
-  const invNames=['','  (1er renvers.)','  (2e renvers.)','  (3e renvers.)'];
-  const invS=state.invIndex===0?'':invNames[state.invIndex]||`  (${state.invIndex}e renvers.)`;
-  sb.textContent=`  ${state.instrument}${capoStr}  |  ${chordStr}${invS}`;
+  sb.textContent=`  ${state.instrument}${capoStr}  |  ${chordStr}`;
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -1615,103 +1586,8 @@ function updateChordLegend(){
 // ══════════════════════════════════════════════════════════════════
 // INVERSIONS
 // ══════════════════════════════════════════════════════════════════
-function updateInversions(){
-  const list=document.getElementById('inv-list');
-  list.innerHTML='';
-  if(!state.cnotes.length||!state.rootNote){
-    list.innerHTML='<div style="color:var(--muted);font-size:10px;font-style:italic">— aucun accord —</div>';
-    return;
-  }
-  const invNames=['État fondamental','1er renversement','2e renversement','3e renversement'];
-  state.cnotes.forEach((_,i)=>{
-    const inv=state.cnotes.slice(i).concat(state.cnotes.slice(0,i));
-    const name=invNames[i]||`${i}e renvers.`;
-    const isActive=(i===state.invIndex);
-    const btn=document.createElement('button');
-    btn.className='inv-btn'+(isActive?' active':'');
 
-    const notesStr=inv.join(' - ');
-    btn.innerHTML=`<span class="inv-play">▶</span><span class="inv-name">${name}</span><span class="inv-notes">${notesStr}</span>`;
-    btn.querySelector('.inv-play').addEventListener('click',ev=>{ev.stopPropagation();playInversion(inv);});
-    btn.addEventListener('click',()=>applyInversion(i));
-    list.appendChild(btn);
-  });
-}
 
-function applyInversion(invIndex){
-  if(!state.cnotes.length||!state.rootNote||state.instrument==='Aucun')return;
-  state.invIndex=invIndex;
-  const inv=state.cnotes.slice(invIndex).concat(state.cnotes.slice(0,invIndex));
-  const capo=state.capo;
-  const newPositions=[];
-  const usedStrings=new Set();
-
-  // Note de basse : corde la plus grave, frette la plus basse dans window 4
-  const bassNote=inv[0];
-  for(let si=0;si<state.tuning.length;si++){
-    const om=noteToMidi(state.tuning[si])+capo;
-    for(let f=0;f<5;f++){
-      if(NOTES[(om+f)%12]===bassNote){
-        newPositions.push([si,f,bassNote]);
-        usedStrings.add(si);
-        break;
-      }
-    }
-    if(usedStrings.has(si))break;
-  }
-
-  // Frette de référence pour la window
-  const bassF=newPositions.length>0?newPositions[0][1]:0;
-  const winMin=bassF===0?0:bassF;
-  const winMax=winMin+4;
-
-  // Autres notes : dans la window autour de la basse
-  for(const note of inv.slice(1)){
-    for(let si=0;si<state.tuning.length;si++){
-      if(usedStrings.has(si))continue;
-      const om=noteToMidi(state.tuning[si])+capo;
-      for(let f=0;f<=24;f++){
-        if(NOTES[(om+f)%12]===note){
-          if(f===0||((winMin===0&&f<=winMax)||f>=winMin&&f<=winMax)){
-            newPositions.push([si,f,note]);
-            usedStrings.add(si);
-            break;
-          }
-        }
-      }
-      if(usedStrings.has(si))break;
-    }
-  }
-
-  newPositions.sort((a,b)=>a[0]-b[0]);
-  state.positions=newPositions;
-  state.manualOverrides={};
-  updateNotesPanel([...new Set(newPositions.map(([,,n])=>n))]);
-  updateInversions();
-  draw();
-  updateStatus();
-}
-
-function playInversion(inv){
-  if(state.instrument==='Aucun')return;
-  const capo=state.capo;
-  const midi=[];
-  const usedStrings=new Set();
-  for(const note of inv){
-    for(let si=0;si<state.tuning.length;si++){
-      if(usedStrings.has(si))continue;
-      const om=noteToMidi(state.tuning[si])+capo;
-      for(let f=0;f<25;f++){
-        if(NOTES[(om+f)%12]===note){
-          midi.push(om+f);
-          usedStrings.add(si);
-          break;
-        }
-      }
-    }
-  }
-  if(midi.length)playMidiNotes(midi,70);
-}
 
 // ══ MOBILE : radio sélection manche unique ══
 document.querySelectorAll('input[name=vis-mobile]').forEach(r=>{
@@ -1727,19 +1603,18 @@ document.querySelectorAll('input[name=vis-mobile]').forEach(r=>{
 
 function resetChord(){
   state.manualOverrides={};
-  state.invIndex=0;
-  state.posMin=0;
+  state.posMin=1;
   updatePosLabels();
   computeAndDraw();
 }
 
 function updatePosLabels(){
   const pl=document.getElementById('pos-min-lbl');
-  if(pl)pl.textContent=state.posMin||0;
+  if(pl)pl.textContent=state.posMin||1;
 }
 
 function changePosMin(delta){
-  state.posMin=Math.max(0,Math.min(18,(state.posMin||0)+delta));
+  state.posMin=Math.max(1,Math.min(18,(state.posMin||1)+delta));
   state.manualOverrides={};
   updatePosLabels();
   computeAndDraw();
@@ -1921,9 +1796,7 @@ function draw(){
   // Save geo for click detection
   state.geo={...g,fb_w:fbW,fb_h:fbH};
 
-  const invNames=['','  (1er renvers.)','  (2e renvers.)','  (3e renvers.)'];
-  const invSuffix=state.invIndex===0?'':invNames[state.invIndex]||`  (${state.invIndex}e renvers.)`;
-  const chordLbl=state.rootNote?`${state.rootNote} ${state.ctype.toUpperCase()}${invSuffix}`:'— cordes à vide —';
+  const chordLbl=state.rootNote?`${state.rootNote} ${state.ctype.toUpperCase()}`:'— cordes à vide —';
 
   drawFretboardBase(ctx,W,H,g,null,capo);
 
@@ -1955,24 +1828,44 @@ function draw(){
   // Corde courte : le capo ne l'affecte que si capo >= shortFret
   const tuningMidi=tuning.map((t,si)=>(isB5&&si===0)?noteToMidi(t):noteToMidi(t)+capo);
 
-  // Dim secondary chord tones
-  const dimCols={'#FF3300':'#7a1a00','#22CC44':'#0d5520','#3399FF':'#0a3a7a','#FFD700':'#7a6000'};
+  // ── Pastilles secondaires : toutes les notes de l'accord sur tout le manche ──
+  // Tier 1 — dans la fenêtre Pos (frettes posMin..posMin+3) :
+  //   taille rDot + bord blanc → même mise en valeur que la pastille dominante
+  // Tier 2 — hors fenêtre :
+  //   taille rSmall + bord couleur → visible mais discret
+  // Cordes à vide (f=0) : inchangées (gérées dans les main dots)
+  const dimCols={'#FF3300':'#7a1a00','#22CC44':'#0d5520','#3399FF':'#0a3a7a','#FFD700':'#7a6000','#FF8800':'#7a4000','#FFAA00':'#7a5000','#00CCCC':'#006060','#0099AA':'#004455','#6666FF':'#222288','#AA44FF':'#550088','#CC44AA':'#661155'};
+  const posMin=state.posMin||1;
   for(let si=0;si<nStr;si++){
     const y=sy(si);
     const isShortDim=isB5&&si===0;
     const voffDim=isShortDim?Math.max(0,shortFret-capo):0;
     for(let f=0;f<=nFrets-voffDim;f++){
-      if(!isShortDim&&f===0)continue; // cordes normales: pas de fret 0 ici (géré après)
+      if(!isShortDim&&f===0)continue; // cordes à vide → gérées séparément
       const note=NOTES[(tuningMidi[si]+f)%12];
       if(!chordSet.has(note))continue;
-      if(posMap[si]?.[0]===f)continue;
+      if(posMap[si]?.[0]===f)continue; // pastille principale déjà dessinée ici
       const col=noteRole(note,state.rootNote,state.ctype);
       const colDim=dimCols[col]||'#555';
-      const xd=f===0?sx(voffDim):sx(f+voffDim-0.5);
-      ctx.strokeStyle=col;ctx.lineWidth=1;ctx.fillStyle=colDim;
-      ctx.beginPath();ctx.arc(xd,y,rSmall,0,Math.PI*2);ctx.fill();ctx.stroke();
-      ctx.fillStyle=col;ctx.font=`bold 7px JetBrains Mono,monospace`;
-      ctx.textAlign='center';ctx.fillText(note,xd,y+2);
+      const inWin=(f>=posMin&&f<=posMin+3);
+      const xd=sx(f+voffDim-0.5);
+      if(inWin){
+        // Tier 1 : dans la fenêtre → pleine taille + bord blanc
+        ctx.fillStyle=colDim;
+        ctx.beginPath();ctx.arc(xd,y,rDot,0,Math.PI*2);ctx.fill();
+        ctx.strokeStyle='#ffffff';ctx.lineWidth=1.5;
+        ctx.beginPath();ctx.arc(xd,y,rDot,0,Math.PI*2);ctx.stroke();
+        ctx.fillStyle=col;ctx.font=dotFntB;
+        ctx.textAlign='center';ctx.fillText(note,xd,y+2);
+      } else {
+        // Tier 2 : hors fenêtre → petit + bord couleur
+        ctx.fillStyle=colDim;
+        ctx.beginPath();ctx.arc(xd,y,rSmall,0,Math.PI*2);ctx.fill();
+        ctx.strokeStyle=col;ctx.lineWidth=1;
+        ctx.beginPath();ctx.arc(xd,y,rSmall,0,Math.PI*2);ctx.stroke();
+        ctx.fillStyle=col;ctx.font=dotFnt;
+        ctx.textAlign='center';ctx.fillText(note,xd,y+2);
+      }
     }
   }
 
