@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="screen-orientation" content="landscape">
 <title>AccordsDeCordes — Manche Graphique</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -242,14 +243,17 @@ select option{background:#1a1a2c}
   .neck-wrap{min-height:140px}
 }
 
-/* Paysage mobile : sidebar étroite */
+/* Paysage mobile : sidebar étroite, manche bien à gauche */
 @media (max-width:900px) and (orientation:landscape){
   #app{height:100dvh}
-  #sidebar{width:160px;min-width:160px;font-size:10px}
-  .section-hdr{font-size:9px;padding:5px 8px}
-  .section-body{padding:4px 6px}
+  #sidebar{width:150px;min-width:150px;font-size:10px}
+  .section-hdr{font-size:9px;padding:4px 6px}
+  .section-body{padding:3px 5px}
   select{font-size:10px;padding:2px 4px}
-  .neck-wrap{min-height:130px}
+  .neck-wrap{min-height:120px}
+  #fullscreen-btn{display:flex!important}
+  #arp-dir-btn{display:flex!important;font-size:9px;padding:5px 6px}
+  #canvas-area{margin-left:0}
 }
 
 /* Grand écran : sidebar plus large */
@@ -421,6 +425,9 @@ select option{background:#1a1a2c}
           <span>● ACCORD</span>
           <button onclick="resetChord()" title="Réinitialiser l'accord" style="background:transparent;border:1px solid #334;color:#6688aa;font-family:'JetBrains Mono',monospace;font-size:9px;padding:2px 7px;border-radius:4px;cursor:pointer;touch-action:manipulation" onmouseover="this.style.borderColor='#00d4ff'" onmouseout="this.style.borderColor='#334'">↺ reset</button>
           <span style="color:#555;font-size:9px">|</span>
+          <button onclick="guessChordName()" title="Deviner le nom de l'accord" id="guess-btn" style="background:#0d1a2a;border:1px solid #3355aa;color:#88aaff;font-family:'JetBrains Mono',monospace;font-size:9px;padding:2px 7px;border-radius:4px;cursor:pointer;touch-action:manipulation" onmouseover="this.style.borderColor='#88aaff'" onmouseout="this.style.borderColor='#3355aa'">🎵 Nom ?</button>
+          <span id="guess-result" style="font-size:10px;color:#ffcc44;font-family:'JetBrains Mono',monospace;display:none"></span>
+          <span style="color:#555;font-size:9px">|</span>
           <span style="font-size:9px;color:#88aaff;font-family:'JetBrains Mono',monospace">Position:</span>
           <button onclick="changePosMin(-1)" style="background:#0d1526;border:1px solid #334;color:#88aaff;font-family:'JetBrains Mono',monospace;font-size:11px;width:22px;height:22px;border-radius:3px;cursor:pointer;touch-action:manipulation;padding:0;line-height:1">◀</button>
           <span id="pos-min-lbl" style="font-size:11px;color:#00d4ff;font-family:'JetBrains Mono',monospace;min-width:20px;text-align:center">1</span>
@@ -549,36 +556,48 @@ const MODES = {
 const DEG_COLORS=["#FF3300","#FF8800","#22CC44","#00CCCC","#3399FF","#AA44FF","#FFD700","#FF88AA"];
 
 const INSTRUMENTS={
-  "Aucun"               :{tuning:[],frets:22},
-  "Guitare 6 cordes"   :{tuning:["E2","A2","D3","G3","B3","E4"],frets:24},
-  "Guitare Alain"      :{tuning:["C2","G2","D3","A3","E4"],frets:24},
-  "Guitare DADGAD"     :{tuning:["D2","A2","D3","G3","A3","D4"],frets:24},
-  "Bouzouki Irlandais" :{tuning:["G3","D4","A4","E5"],frets:24,double:[true,true,true,true]},
-  "Basse 4 cordes"     :{tuning:["E1","A1","D2","G2"],frets:24},
-  "Basse 5 cordes"     :{tuning:["B0","E1","A1","D2","G2"],frets:24},
-  "Basse 6 cordes"     :{tuning:["B0","E1","A1","D2","G2","C3"],frets:24},
-  "Ukulele"            :{tuning:["G4","C4","E4","A4"],frets:24},
-  "Mandoline"          :{tuning:["G3","D4","A4","E5"],frets:24,double:[true,true,true,true]},
-  "Violon"             :{tuning:["G3","D4","A4","E5"],frets:24},
-  "Banjo Tenor 4c"     :{tuning:["C3","G3","D4","A4"],frets:22},
-  "Banjo 5 cordes"     :{tuning:["G4","D3","G3","B3","D4"],frets:22,shortString:true,shortFret:5},
-  "Oud"                :{tuning:["C2","F2","A2","D3","G3","C4"],frets:24,double:[false,true,true,true,true,true]},
-  "Personnalise"       :{tuning:["E2","A2","D3","G3","B3","E4"],frets:24},
+  "Aucun"                          :{tuning:[],frets:22},
+  "Guitare 6c EADGBE"              :{tuning:["E2","A2","D3","G3","B3","E4"],frets:24},
+  "Guitare Drop D DADGBE"          :{tuning:["D2","A2","D3","G3","B3","E4"],frets:24},
+  "Guitare DADGAD"                 :{tuning:["D2","A2","D3","G3","A3","D4"],frets:24},
+  "Guitare Alain CGDAE"            :{tuning:["C2","G2","D3","A3","E4"],frets:24},
+  "Basse 4c EADG"                  :{tuning:["E1","A1","D2","G2"],frets:24},
+  "Basse 5c BEADG"                 :{tuning:["B0","E1","A1","D2","G2"],frets:24},
+  "Basse 6c BEADGC"                :{tuning:["B0","E1","A1","D2","G2","C3"],frets:24},
+  "Bouzouki Irlandais GDAE"        :{tuning:["G3","D4","A4","E5"],frets:24,double:[true,true,true,true]},
+  "Bouzouki Grec CFAD"             :{tuning:["C3","F3","A3","D4"],frets:24,double:[false,true,true,true]},
+  "Bouzouki Grec DGBE"             :{tuning:["D3","G3","B3","E4"],frets:24,double:[false,true,true,true]},
+  "Mandoline GDAE"                 :{tuning:["G3","D4","A4","E5"],frets:24,double:[true,true,true,true]},
+  "Violon GDAE"                    :{tuning:["G3","D4","A4","E5"],frets:24},
+  "Banjo 4c CGDA"                  :{tuning:["C2","G2","D3","A3"],frets:22},
+  "Banjo Tenor 4c CGDA"            :{tuning:["C3","G3","D4","A4"],frets:22},
+  "Banjo 5 cordes gDGBD"           :{tuning:["G4","D3","G3","B3","D4"],frets:22,shortString:true,shortFret:5},
+  "Ukulele GCEA"                   :{tuning:["G4","C4","E4","A4"],frets:24},
+  "Cistre CGDA"                    :{tuning:["C3","G3","D4","A4"],frets:24,double:[true,true,true,true]},
+  "Luth Renaiss. GCFADG"           :{tuning:["G2","C3","F3","A3","D4","G4"],frets:24,double:[false,true,true,true,true,false]},
+  "Oud CFADGC"                     :{tuning:["C2","F2","A2","D3","G3","C4"],frets:24,double:[false,true,true,true,true,true]},
+  "Personnalise"                   :{tuning:["E2","A2","D3","G3","B3","E4"],frets:24},
 };
 const STR_THICK={
-  "Guitare 6 cordes"   :[4,3.2,2.6,1.8,1.3,0.9],
-  "Guitare Alain"      :[4,3.2,2.6,1.8,1.3],
-  "Guitare DADGAD"     :[4,3.2,2.6,1.8,1.3,0.9],
-  "Bouzouki Irlandais" :[1.2,1.4,1.6,1.2],
-  "Basse 4 cordes"     :[5,4,3,2.2],
-  "Basse 5 cordes"     :[6,5,4,3,2.2],
-  "Basse 6 cordes"     :[6,5,4,3,2.2,1.6],
-  "Ukulele"            :[1.8,1.4,1.2,1.0],
-  "Mandoline"          :[1,1.2,1.5,1],
-  "Violon"             :[2,1.6,1.2,0.9],
-  "Banjo Tenor 4c"     :[2,1.6,1.2,0.9],
-  "Banjo 5 cordes"     :[1,2.2,1.8,1.4,1],
-  "Oud"                :[3,2.5,2,1.6,1.2,1],
+  "Guitare 6c EADGBE"     :[4,3.2,2.6,1.8,1.3,0.9],
+  "Guitare Drop D DADGBE" :[4,3.2,2.6,1.8,1.3,0.9],
+  "Guitare Alain CGDAE"   :[4,3.2,2.6,1.8,1.3],
+  "Guitare DADGAD"        :[4,3.2,2.6,1.8,1.3,0.9],
+  "Bouzouki Irlandais GDAE":[1.2,1.4,1.6,1.2],
+  "Bouzouki Grec CFAD"    :[1.4,1.5,1.5,1.2],
+  "Bouzouki Grec DGBE"    :[1.4,1.5,1.5,1.2],
+  "Basse 4c EADG"         :[5,4,3,2.2],
+  "Basse 5c BEADG"        :[6,5,4,3,2.2],
+  "Basse 6c BEADGC"       :[6,5,4,3,2.2,1.6],
+  "Ukulele GCEA"          :[1.8,1.4,1.2,1.0],
+  "Mandoline GDAE"        :[1,1.2,1.5,1],
+  "Violon GDAE"           :[2,1.6,1.2,0.9],
+  "Banjo 4c CGDA"         :[2.4,2,1.5,1.1],
+  "Banjo Tenor 4c CGDA"   :[2,1.6,1.2,0.9],
+  "Banjo 5 cordes gDGBD"  :[1,2.2,1.8,1.4,1],
+  "Cistre CGDA"           :[1.6,1.4,1.3,1.1],
+  "Luth Renaiss. GCFADG"  :[2.8,2.4,2,1.6,1.2,0.9],
+  "Oud CFADGC"            :[3,2.5,2,1.6,1.2,1],
 };
 // Timbres Karplus-Strong — regroupés par famille
 // ══════════════════════════════════════════════════════════════════
@@ -727,7 +746,6 @@ function _gmSynthParams(prog){
 
 // État son courant
 let _currentProg=24; // Guitare nylon par défaut
-const TIMBRES=['Guitare nylon']; // compatibilité state.timbre
 
 // ══════════════════════════════════════════════════════════════════
 // AUDIO ENGINE (WebAudio — fonctionne Android, iOS, Desktop)
@@ -858,7 +876,7 @@ function playMidiNotes(midiNotes,arpMs=130){
 // STATE
 // ══════════════════════════════════════════════════════════════════
 let state={
-  instrument:"Guitare 6 cordes",
+  instrument:"Guitare 6c EADGBE",
   tuning:["E2","A2","D3","G3","B3","E4"],
   double:[false,false,false,false,false,false],
   rootNote:null,
@@ -1045,7 +1063,7 @@ function initSelects(){
   Object.keys(INSTRUMENTS).forEach(k=>{
     const o=document.createElement('option');o.value=k;o.textContent=k;instSel.appendChild(o);
   });
-  instSel.value='Guitare 6 cordes';
+  instSel.value='Guitare 6c EADGBE';
 
   // Frettes
   const fSel=document.getElementById('frets-sel');
@@ -1106,12 +1124,32 @@ function initSelects(){
     const og=document.createElement('optgroup');og.label=grp;
     sounds.forEach(({prog,label})=>{
       const o=document.createElement('option');o.value=prog;o.textContent=label;
-      if(prog===_currentProg)o.selected=true;
+      if(prog===24)o.selected=true; // Guitare nylon par défaut
       og.appendChild(o);
     });
     tSel.appendChild(og);
   }
+  // S'assurer que le timbre par défaut est bien nylon
+  tSel.value='24';
+  _currentProg=24;
 }
+
+// Reference notes for common instruments — helps identify octaves
+const NOTE_REFERENCES = {
+  "E2": "E2 · Mi grave Guitare/Basse",
+  "E4": "E4 · Mi aigu Guitare",
+  "E1": "E1 · Mi Basse 4c grave",
+  "A2": "A2 · La Guitare 5e corde",
+  "A4": "A4 · La diapason 440Hz",
+  "G3": "G3 · Sol Violon grave",
+  "G4": "G4 · Sol Banjo 5c",
+  "D4": "D4 · Ré Violon 2e",
+  "A3": "A3 · La Violon 3e",
+  "E5": "E5 · Mi Violon/Mandoline aigu",
+  "B0": "B0 · Si Basse 5c grave",
+  "G2": "G2 · Sol Basse 4c aigu",
+  "C4": "C4 · Do médium (central)",
+};
 
 function buildTuningUI(){
   const frame=document.getElementById('tuning-frame');
@@ -1143,16 +1181,34 @@ function buildTuningUI(){
     });
     row.appendChild(lbl2);row.appendChild(nbSel);frame.appendChild(row);
   }
-  state.tuning.forEach((note,si)=>{
+  // Afficher du plus aigu (index élevé) au plus grave (index 0) — comme visuellement sur le manche
+  const nStr=state.tuning.length;
+  const indices=[...Array(nStr).keys()].reverse(); // aigu (haut du manche) en premier
+  indices.forEach((si)=>{
+    const note=state.tuning[si];
     const dbl=state.double[si];
     const lbl=document.createElement('div');
     lbl.className='str-lbl';
-    lbl.textContent=(si+1)+(dbl?' ×2':'');
-    lbl.style.color=dbl?'var(--str-dbl)':'var(--muted)';
+    // Numéro depuis 1 (grave) à nStr (aigu) — but displayed in reverse
+    const strNum=si+1;
+    const isAigu=si===nStr-1, isGrave=si===0;
+    const strLabel=strNum+(dbl?' ×2':'')+(isAigu?' ▲':isGrave?' ▼':'');
+    lbl.textContent=strLabel;
+    lbl.title=isAigu?'Corde la plus aiguë':isGrave?'Corde la plus grave':'';
+    lbl.style.color=dbl?'var(--str-dbl)':isAigu?'#aaccff':isGrave?'#ffaa88':'var(--muted)';
     frame.appendChild(lbl);
+
+    // Container for select + ref note
+    const wrap=document.createElement('div');
+    wrap.style.cssText='display:flex;flex-direction:column;gap:1px';
+
     const sel=document.createElement('select');
+    sel.style.cssText='width:100%;font-size:10px;padding:2px 4px';
     NOTE_OPTIONS.forEach(n=>{
-      const o=document.createElement('option');o.value=n;o.textContent=n;
+      const o=document.createElement('option');o.value=n;
+      // Add reference label if known
+      const ref=NOTE_REFERENCES[n];
+      o.textContent=ref?n+' — '+ref.split('·')[1].trim():n;
       if(n===note)o.selected=true;
       sel.appendChild(o);
     });
@@ -1161,7 +1217,19 @@ function buildTuningUI(){
       if(state.instrument==='Personnalise')INSTRUMENTS['Personnalise'].tuning=[...state.tuning];
       computeAndDraw();
     });
-    frame.appendChild(sel);
+
+    // Show reference note hint if known
+    const refNote=NOTE_REFERENCES[note];
+    if(refNote){
+      const hint=document.createElement('div');
+      hint.style.cssText='font-size:8px;color:#5577aa;font-family:JetBrains Mono,monospace;padding-left:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+      hint.textContent=refNote.split('·')[1]?refNote.split('·')[1].trim():'';
+      wrap.appendChild(sel);
+      wrap.appendChild(hint);
+    } else {
+      wrap.appendChild(sel);
+    }
+    frame.appendChild(wrap);
   });
 }
 
@@ -1293,7 +1361,7 @@ document.getElementById('mode-sel').addEventListener('change',e=>{
 });
 document.getElementById('vol').addEventListener('input',e=>{state.volume=parseFloat(e.target.value)});
 document.getElementById('timbre-sel').addEventListener('change',e=>{
-  _currentProg=parseInt(e.target.value)||25;
+  _currentProg=parseInt(e.target.value)||24;
   state.timbre=e.target.options[e.target.selectedIndex].text;
 });
 document.getElementById('play-btn').addEventListener('click',playChord);
@@ -1413,16 +1481,16 @@ function xyToStringFret(x,y,g){
   }
   if(bestSi===null)return null;
 
-  // Zone bouton PLAY (priorité haute) : ML-80 ± TOUCH_R
-  const btnX=g.small?ML-68:ML-80;
+  // Zone bouton PLAY : ML-88 (relatif au ML courant)
+  const btnX=g.small?ML-76:ML-88;
   if(Math.abs(x-btnX)<TOUCH_R){return[bestSi,0,'play'];}
 
-  // Zone MUTE/VIDE : cercle à ML-62 ± TOUCH_R
-  const openX=g.small?ML-52:ML-62;
+  // Zone MUTE/VIDE : cercle à ML-70
+  const openX=g.small?ML-58:ML-70;
   if(Math.abs(x-openX)<TOUCH_R){return[bestSi,0,'open'];}
 
-  // Zone ouverte générale (entre les deux boutons et le sillet)
-  if(x>=ML-94&&x<=ML){return[bestSi,0,'open'];}
+  // Zone ouverte générale
+  if(x>=ML-100&&x<=ML){return[bestSi,0,'open'];}
 
   // Zone manche : frettes
   if(x>ML&&x<=ML+fb_w){
@@ -1507,70 +1575,190 @@ function updateNotesPanel(notes){}  // section composition supprimée
 // Tous les degrés possibles avec leur couleur
 // Degrés : génération des noms avec la note réelle relative à la fondamentale
 // Pour les degrés altérés, on montre "bX" ou "#X" avec X = note naturelle du degré
+// Degrés de base (en demi-tons 0-11 dans l'octave)
+// Pour chaque intervalle : {iv, col, name, altIv, altName, altCol}
+// altIv/altName/altCol = interprétation étendue (9e, 11e, 13e) si pertinent
 function buildDegrees(rootNote){
   const ri = rootNote ? NOTES.indexOf(rootNote) : null;
   function n(semis){ return ri!==null ? NOTES[(ri+semis)%12] : ''; }
-  // La note affichée est simplement la note chromatique de l'intervalle
-  // Ex: pour Am, b3 (iv=3) → NOTES[(9+3)%12] = C ✓ (pas C#b)
   return [
-    {iv:0,  col:'#FF3300', label: () => n(0),  name:'Fondamentale'},
-    {iv:1,  col:'#FF6600', label: () => n(1),  name:'b2 — Seconde dim.'},
-    {iv:2,  col:'#FF8800', label: () => n(2),  name:'2 — Seconde'},
-    {iv:3,  col:'#FFAA00', label: () => n(3),  name:'b3 — Tierce min.'},
-    {iv:4,  col:'#22CC44', label: () => n(4),  name:'3 — Tierce maj.'},
-    {iv:5,  col:'#00CCCC', label: () => n(5),  name:'4 — Quarte / 11e'},
-    {iv:6,  col:'#0099AA', label: () => n(6),  name:'b5 — Quinte dim.'},
-    {iv:7,  col:'#3399FF', label: () => n(7),  name:'5 — Quinte'},
-    {iv:8,  col:'#6666FF', label: () => n(8),  name:'#5 — Quinte aug.'},
-    {iv:9,  col:'#AA44FF', label: () => n(9),  name:'6 — Sixte / 13e'},
-    {iv:10, col:'#CC44AA', label: () => n(10), name:'b7 — Sept. min.'},
-    {iv:11, col:'#FFD700', label: () => n(11), name:'7 — Sept. maj.'},
+    {iv:0,  col:'#FF3300', label:()=>n(0),  name:'1 — Fondamentale'},
+    {iv:1,  col:'#FF6600', label:()=>n(1),  name:'b2 — Seconde dim.'},
+    // 2 demi-tons = Seconde, MAIS dans un accord avec 7e c'est la 9e
+    {iv:2,  col:'#888888', label:()=>n(2),  name:'2 — Seconde',
+     altName:'9 — Neuvième', altCol:'#FF8800'},
+    {iv:3,  col:'#FFAA00', label:()=>n(3),  name:'b3 — Tierce min.'},
+    {iv:4,  col:'#22CC44', label:()=>n(4),  name:'3 — Tierce maj.'},
+    // 5 demi-tons = Quarte, MAIS dans un accord avec 7e c'est la 11e
+    {iv:5,  col:'#888888', label:()=>n(5),  name:'4 — Quarte',
+     altName:'11 — Onzième', altCol:'#00CCCC'},
+    {iv:6,  col:'#0099AA', label:()=>n(6),  name:'b5 / #11 — Q.dim/11A'},
+    {iv:7,  col:'#3399FF', label:()=>n(7),  name:'5 — Quinte'},
+    {iv:8,  col:'#6666FF', label:()=>n(8),  name:'#5 — Quinte aug.'},
+    // 9 demi-tons = Sixte, MAIS dans un accord avec 7e c'est la 13e
+    {iv:9,  col:'#888888', label:()=>n(9),  name:'6 — Sixte',
+     altName:'13 — Treizième', altCol:'#AA44FF'},
+    {iv:10, col:'#CC44AA', label:()=>n(10), name:'b7 — Sept. min.'},
+    {iv:11, col:'#FFD700', label:()=>n(11), name:'7 — Sept. maj.'},
   ];
 }
 
 // Version statique pour les endroits qui n'ont pas de root
 const ALL_DEGREES=buildDegrees(null).map(d=>({iv:d.iv,name:d.name,col:d.col}));
 
+// Détecte si l'accord courant EST un accord avec 7e (donc 2=9, 4=11, 6=13)
+function chordHasSeventh(ctype){
+  if(!ctype||!CHORD_FORMULAS[ctype])return false;
+  const ivs=CHORD_FORMULAS[ctype][0];
+  return ivs.some(iv=>iv%12===10||iv%12===11); // b7 ou 7
+}
+// Détecte si l'accord a des extensions ≥ 9e (intervalles > 11)
+function chordHasExtensions(ctype){
+  if(!ctype||!CHORD_FORMULAS[ctype])return false;
+  return CHORD_FORMULAS[ctype][0].some(iv=>iv>11);
+}
+
 function updateDegreeChecks(){
   const el=document.getElementById('degree-checks');
   if(!el)return;
 
   const presentIvs=new Set();
+  const presentIvsRaw=new Set(); // intervalles bruts (peut dépasser 11)
   if(state.rootNote&&state.ctype&&CHORD_FORMULAS[state.ctype]){
-    CHORD_FORMULAS[state.ctype][0].forEach(iv=>presentIvs.add(iv%12));
+    CHORD_FORMULAS[state.ctype][0].forEach(iv=>{
+      presentIvsRaw.add(iv);
+      presentIvs.add(iv%12);
+    });
   }
+
+  const hasSeventh=chordHasSeventh(state.ctype);
+  const hasExt=chordHasExtensions(state.ctype);
+  // Si l'accord a des extensions ≥9e, les intervalles 2,4,6 dans l'accord
+  // sont en réalité 9,11,13 — on affiche les deux labels
+  const extMode=hasSeventh||hasExt;
 
   el.innerHTML='';
   const degrees=buildDegrees(state.rootNote);
 
-  degrees.forEach(({iv,name,col,label})=>{
+  degrees.forEach(({iv,name,col,label,altName,altCol})=>{
     const present=presentIvs.has(iv);
-    // Note toujours affichée, même si absent
     const noteStr=label(iv);
 
+    // Pour les intervalles ambigus (2,4,6) dans un accord étendu :
+    // si présent, montrer le label "simple" en gris + le label étendu en couleur
+    const isAmbig=altName!==undefined;
+    const showDual=isAmbig&&present&&extMode;
+
     const row=document.createElement('div');
-    row.style.cssText=`display:flex;align-items:center;gap:5px;
+    row.style.cssText=`display:flex;align-items:center;gap:4px;
       padding:1px 2px;border-radius:3px;
-      opacity:${present?1:0.3};`;
+      opacity:${present?1:0.28};`;
 
     const dot=document.createElement('div');
     dot.style.cssText=`width:9px;height:9px;border-radius:50%;flex-shrink:0;
-      background:${present?col:'transparent'};
-      border:1.5px solid ${col};`;
+      background:${present?(showDual?altCol:col):'transparent'};
+      border:1.5px solid ${showDual?altCol:col};`;
 
     const noteLbl=document.createElement('span');
     noteLbl.style.cssText=`font-family:'JetBrains Mono',monospace;font-size:9px;
-      font-weight:bold;color:${col};min-width:22px;`;
+      font-weight:bold;color:${showDual?altCol:col};min-width:22px;`;
     noteLbl.textContent=noteStr;
 
-    const degLbl=document.createElement('span');
-    degLbl.style.cssText=`font-family:'JetBrains Mono',monospace;font-size:9px;
-      color:${present?col:'var(--muted)'};`;
-    degLbl.textContent=name;
+    row.appendChild(dot);
+    row.appendChild(noteLbl);
 
-    row.appendChild(dot);row.appendChild(noteLbl);row.appendChild(degLbl);
+    if(showDual){
+      // Label simple barré/grisé
+      const simpleLbl=document.createElement('span');
+      simpleLbl.style.cssText=`font-family:'JetBrains Mono',monospace;font-size:8px;
+        color:#555;text-decoration:none;`;
+      simpleLbl.textContent=name.split('—')[0].trim()+'—'+name.split('—')[1];
+
+      // Flèche
+      const arrow=document.createElement('span');
+      arrow.style.cssText='font-size:8px;color:#444;';
+      arrow.textContent=' → ';
+
+      // Label étendu en couleur
+      const extLbl=document.createElement('span');
+      extLbl.style.cssText=`font-family:'JetBrains Mono',monospace;font-size:9px;
+        font-weight:bold;color:${altCol};`;
+      extLbl.textContent=altName;
+
+      row.appendChild(simpleLbl);
+      row.appendChild(arrow);
+      row.appendChild(extLbl);
+    } else {
+      const degLbl=document.createElement('span');
+      degLbl.style.cssText=`font-family:'JetBrains Mono',monospace;font-size:9px;
+        color:${present?col:'var(--muted)'};`;
+      degLbl.textContent=name;
+      row.appendChild(degLbl);
+    }
+
     el.appendChild(row);
   });
+}
+
+// ══════════════════════════════════════════════════════════════════
+// CHORD NAME GUESSER
+// ══════════════════════════════════════════════════════════════════
+function guessChordName(){
+  const resultEl=document.getElementById('guess-result');
+  if(!resultEl)return;
+
+  // Collecter les notes jouées (positions actives)
+  const playedNotes=[...new Set(
+    state.positions.filter(([,f])=>f>=0)
+      .map(([si,f])=>NOTES[(noteToMidi(state.tuning[si])+f)%12])
+  )];
+
+  if(playedNotes.length<2){
+    resultEl.textContent='Trop peu de notes';
+    resultEl.style.display='inline';
+    setTimeout(()=>{resultEl.style.display='none';},2500);
+    return;
+  }
+
+  const noteSet=new Set(playedNotes);
+  const nNotes=noteSet.size;
+  let bestMatches=[];
+
+  // Tester chaque note comme fondamentale potentielle
+  for(const root of NOTES){
+    const ri=NOTES.indexOf(root);
+    // Calculer les intervalles modulo 12
+    const intervals=new Set([...noteSet].map(n=>((NOTES.indexOf(n)-ri)+12)%12));
+
+    for(const [ctype,[ivArr]] of Object.entries(CHORD_FORMULAS)){
+      if(ctype==='personnalise')continue;
+      const formula=new Set(ivArr.map(iv=>iv%12));
+      // Score : combien de notes de l'accord correspondent
+      let match=0,extra=0;
+      intervals.forEach(iv=>{if(formula.has(iv))match++;else extra++;});
+      // Bonus si toutes les notes de la formule sont présentes
+      const coverage=match/formula.size;
+      const precision=match/nNotes;
+      const score=coverage*0.6+precision*0.4-(extra*0.15);
+      if(score>0.55&&match>=2){
+        bestMatches.push({root,ctype,score,match,total:formula.size,extra});
+      }
+    }
+  }
+
+  bestMatches.sort((a,b)=>b.score-a.score);
+  const top=bestMatches.slice(0,3);
+
+  if(top.length===0){
+    resultEl.textContent='Accord non identifié';
+    resultEl.style.color='#ff6644';
+  } else {
+    const names=top.map(m=>`${m.root} ${m.ctype}`).join('  /  ');
+    resultEl.textContent='→ '+names;
+    resultEl.style.color='#ffcc44';
+  }
+  resultEl.style.display='inline';
+  setTimeout(()=>{resultEl.style.display='none';},6000);
 }
 
 function updateChordLegend(){
@@ -1657,7 +1845,7 @@ function setupCanvas(id){
 }
 
 function getFretboardGeometry(W,H,nStr,nFrets,extraMT){
-  const ML=92, MR=24;
+  const ML=100, MR=24;  // ML augmenté pour afficher note+octave+référence
   const MT=(extraMT||0)+(H<200?32:50);
   const MB=20;
   const STR_MARGIN=8;
@@ -1729,13 +1917,21 @@ function drawStrings(ctx,g,tuning,dbl,thicknesses){
   const{ML,fbH,fbW,fw,MT,sy,n_str,sx}=g;
   const isB5=isBanjo5();
   const sf=isB5?shortStringFret():0;
+  // Mapping note+octave → short reference label
+  const STR_REFS={
+    "E2":"E2 gtr▼","E4":"E4 gtr▲","E1":"E1 basse▼","E5":"E5 vln▲",
+    "A2":"A2 gtr","A4":"A4 440Hz","A1":"A1 basse",
+    "G3":"G3 vln▼","G4":"G4 bnj","G2":"G2 basse▲",
+    "D4":"D4 vln","D3":"D3 gtr","D2":"D2 gtr","D1":"D1 basse",
+    "B0":"B0 basse▼","B3":"B3 gtr","C4":"C4 Do mid",
+    "C2":"C2 oud","C3":"C3 oud",
+  };
   for(let si=0;si<n_str;si++){
     const y=sy(si);
     const isDbl=dbl[si];
     const thick=thicknesses[si]||1;
     const col=isDbl?'#e8d080':'#c8c8c8';
     const isShort=isB5&&si===0;
-    // Capo < short_fret : décale visuellement ; capo >= short_fret : part de 0
     const effStart=isShort?Math.max(0,sf-state.capo):0;
     const xStart=isShort?sx(effStart):ML;
     if(isDbl){
@@ -1747,22 +1943,41 @@ function drawStrings(ctx,g,tuning,dbl,thicknesses){
       ctx.strokeStyle=col;ctx.lineWidth=Math.max(1,Math.round(thick));
       ctx.beginPath();ctx.moveTo(xStart,y);ctx.lineTo(ML+fw*g.n_frets,y);ctx.stroke();
     }
-    // Pastille d'accroche : seulement si la corde n'est pas sous le capo
     if(isShort&&effStart>0){
       ctx.fillStyle='#c8a050';ctx.strokeStyle='#f5deb3';ctx.lineWidth=1.5;
       ctx.beginPath();ctx.arc(xStart,y,5,0,Math.PI*2);ctx.fill();ctx.stroke();
     }
-    // Note réelle : G + max(0, capo - short_fret) si capo dépasse l'accroche
     const realNote=isShort
       ?NOTES[(noteToMidi(tuning[si])+Math.max(0,state.capo-sf))%12]
       :NOTES[(noteToMidi(tuning[si])+state.capo)%12];
+    // Full note name with octave for identification
+    const tuningNote=isShort?tuning[si]:tuning[si]; // full note+octave string
+    const capoAdjNote=isShort
+      ?NOTES[(noteToMidi(tuning[si])+Math.max(0,state.capo-sf))%12]+tuning[si].slice(tuning[si].search(/\d/))
+      :(()=>{const m=noteToMidi(tuning[si])+state.capo;return NOTES[m%12]+Math.floor((m)/12-1)})();
+
     const noteCol=isShort?'#c8a050':isDbl?'#e8d080':'#e8e8f0';
     const fntStr=g.small?'bold 7px JetBrains Mono,monospace':'bold 9px JetBrains Mono,monospace';
+    const fntRef=g.small?'5px JetBrains Mono,monospace':'6px JetBrains Mono,monospace';
+
+    // Show note name with octave
     ctx.fillStyle=noteCol;ctx.font=fntStr;
-    ctx.textAlign='left';ctx.fillText(realNote,ML-45,y+3);
+    ctx.textAlign='right';
+    const noteWithOct=state.capo===0?tuning[si]:capoAdjNote;
+    ctx.fillText(noteWithOct,ML-48,y+3);
+
+    // Show reference hint below note
+    const refKey=state.capo===0?tuning[si]:capoAdjNote;
+    const refTxt=STR_REFS[refKey];
+    if(refTxt&&!g.small){
+      ctx.fillStyle='#446688';ctx.font=fntRef;
+      ctx.textAlign='right';
+      ctx.fillText(refTxt,ML-48,y+10);
+    }
+
     if(isShort){
       ctx.fillStyle='#876030';ctx.font=g.small?'6px JetBrains Mono,monospace':'7px JetBrains Mono,monospace';
-      ctx.textAlign='left';ctx.fillText('(5fr)',ML-50,y+12);
+      ctx.textAlign='right';ctx.fillText('(5fr)',ML-48,y+16);
     }
   }
 }
@@ -1867,7 +2082,7 @@ function draw(){
     }
   }
 
-  // Cercle "à vide" cliquable — même taille que bouton play (r=9), à ML-50
+  // Cercle "à vide" cliquable — à ML-70
   for(let si=0;si<nStr;si++){
     const y=sy(si);
     const isShort=isB5&&si===0;
@@ -1875,13 +2090,11 @@ function draw(){
     const isMuted=posMap[si]===undefined;
     const isFretZero=posMap[si]?.[0]===0;
     const openR=g.small?5:7;
-    const openX=g.small?ML-52:ML-62;
-    // Cercle visible en permanence, coloré selon l'état
+    const openX=g.small?ML-58:ML-70;
     ctx.fillStyle=isFretZero?'#1a2a1a':isMuted?'#2a1a1a':'rgba(255,255,255,0.04)';
     ctx.strokeStyle=isFretZero?'#2ecc71':isMuted?'#e74c3c':'rgba(255,255,255,0.25)';
     ctx.lineWidth=1.5;
     ctx.beginPath();ctx.arc(openX,y,openR,0,Math.PI*2);ctx.fill();ctx.stroke();
-    // Symbole intérieur
     if(isMuted){
       ctx.fillStyle='#e74c3c';ctx.font='bold 9px Arial';
       ctx.textAlign='center';ctx.fillText('✕',openX,y+3);
@@ -1932,7 +2145,7 @@ function draw(){
   for(let si=0;si<nStr;si++){
     const y=sy(si);
     const isShort=isB5&&si===0;
-    const btnX=g.small?ML-68:ML-80;  // bouton play
+    const btnX=g.small?ML-76:ML-88;  // bouton play (ML-88 relatif à ML=100)
     const btnR=9;
     const inPos=posMap[si]!==undefined;
 
@@ -1944,8 +2157,8 @@ function draw(){
     ctx.textAlign='center';ctx.fillText('▶',btnX+1,y+2);
 
     if(!posMap[si]){
-      // Corde muette — croix (×)
-      const cx=ML-62,cy=y,cr=rDot*0.65;
+      // Corde muette — croix (×) à ML-70
+      const cx=ML-70,cy=y,cr=rDot*0.65;
       ctx.strokeStyle='#e74c3c';ctx.lineWidth=2;
       ctx.beginPath();ctx.moveTo(cx-cr,cy-cr);ctx.lineTo(cx+cr,cy+cr);ctx.stroke();
       ctx.beginPath();ctx.moveTo(cx-cr,cy+cr);ctx.lineTo(cx+cr,cy-cr);ctx.stroke();
@@ -1954,12 +2167,11 @@ function draw(){
     const[fret,note]=posMap[si];
     const dotCol=noteRole(note,state.rootNote,state.ctype);
     const isRoot=dotCol==='#FF3300',isThird=dotCol==='#22CC44',isFifth=dotCol==='#3399FF';
-    // Offset visuel : fret musical → position sur le manche (banjo 5c : +shortFret)
-    const voffM=isShort?Math.max(0,shortFret-capo):0; // offset visuel capo-aware
+    const voffM=isShort?Math.max(0,shortFret-capo):0;
 
     if(fret===0&&!isShort){
-      // Corde normale à vide : pastille dans le cercle à vide (ML-50)
-      const r2=rDot*0.65,x2=ML-62;
+      // Corde normale à vide : pastille dans le cercle à vide (ML-70)
+      const r2=rDot*0.65,x2=ML-70;
       ctx.fillStyle=isRoot?dotCol:(capo>0?dotCol:'');
       ctx.strokeStyle=isRoot?'#fff':dotCol;ctx.lineWidth=2;
       ctx.beginPath();ctx.arc(x2,y,r2,0,Math.PI*2);
@@ -2026,7 +2238,7 @@ function drawFretboardGeneric(id,title,intervals,rootNote){
   const dotFnt=g.small?'5px JetBrains Mono,monospace':'6px JetBrains Mono,monospace';
   const dotFntB=g.small?'bold 5px JetBrains Mono,monospace':'bold 6px JetBrains Mono,monospace';
   const r2=rDot*0.7;
-  const xOpen=ML-46;
+  const xOpen=ML-54;  // ajusté pour ML=100
 
   const isB5generic=isBanjo5();
   const sfGeneric=isB5generic?shortStringFret():0;
@@ -2103,13 +2315,13 @@ window.addEventListener('resize',()=>{
 initSelects();
 
 // ── Préselections à l'ouverture ──
-// Instrument : Guitare 6 cordes
-document.getElementById('inst-sel').value='Guitare 6 cordes';
-const instDef=INSTRUMENTS['Guitare 6 cordes'];
+// Instrument : Guitare 6c EADGBE
+document.getElementById('inst-sel').value='Guitare 6c EADGBE';
+const instDef=INSTRUMENTS['Guitare 6c EADGBE'];
 state.tuning=[...instDef.tuning];
 state.double=new Array(instDef.tuning.length).fill(false);
 state.nFrets=22;
-state.instrument='Guitare 6 cordes';
+state.instrument='Guitare 6c EADGBE';
 buildTuningUI();
 
 // Note fondamentale : C (Do)
