@@ -1058,7 +1058,8 @@ function detectBarres(positions){
     }
   }
 
-  // 2. Barrés détectés automatiquement (plusieurs cordes sur même frette > 0)
+  // 2. Barrés détectés automatiquement — seulement si TOUTES les cordes
+  //    entre fromStr et toStr sont à cette frette (vrai barré physique)
   if(!state._lastBarreFret){
     const byFret={};
     positions.forEach(([si,f])=>{if(f>0)byFret[f]=(byFret[f]||[]).concat(si);});
@@ -1067,7 +1068,11 @@ function detectBarres(positions){
       if(strings.length<2)continue;
       const sorted=[...new Set(strings)].sort((a,b)=>a-b);
       const minSi=sorted[0],maxSi=sorted[sorted.length-1];
-      if(maxSi-minSi>=1)barres.push({fret:f,fromStr:minSi,toStr:maxSi});
+      // Vérifier que TOUTES les cordes dans la plage sont à cette frette
+      const span=maxSi-minSi+1;
+      if(sorted.length===span&&span>=2){
+        barres.push({fret:f,fromStr:minSi,toStr:maxSi});
+      }
     }
   }
 
