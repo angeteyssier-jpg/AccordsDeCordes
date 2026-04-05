@@ -1030,27 +1030,43 @@ function scaleColor(deg,noteI,rootI){
 // ══════════════════════════════════════════════════════════════════
 // BARRÉ DETECTION
 // ══════════════════════════════════════════════════════════════════
-// Retourne [{fret, strings:[si,...], fromStr, toStr}] — barrés détectés dans positions
+// Retourne [{fret, fromStr, toStr}] — barrés à dessiner
 function detectBarres(positions){
-  if(!positions||positions.length<2)return[];
-  // Grouper les frettes non nulles
-  const byFret={};
-  positions.forEach(([si,f])=>{if(f>0)byFret[f]=(byFret[f]||[]).concat(si);});
+  if(!positions)return[];
   const barres=[];
-  for(const [fStr,strings] of Object.entries(byFret)){
-    const f=parseInt(fStr);
-    if(strings.length<2)continue;
-    // Trier les cordes (index croissant = grave → aigu visuellement)
-    const sorted=[...strings].sort((a,b)=>a-b);
-    // Vérifier que toutes les cordes entre min et max sont présentes ou plus haute frette
-    // (barré classique : min_corde à max_corde sur la même frette, toutes les cordes intermédiaires ≥ fret)
-    const minSi=sorted[0], maxSi=sorted[sorted.length-1];
-    // Construire ensemble des cordes dans la plage
-    const inRange=positions.filter(([si,fr])=>si>=minSi&&si<=maxSi&&fr>=f);
-    if(inRange.length===maxSi-minSi+1&&sorted.length>=2){
-      barres.push({fret:f, fromStr:minSi, toStr:maxSi, strings:sorted});
+
+  // 1. Barré explicite via _lastBarreFret : span toutes les cordes où le barré a été posé
+  if(state._lastBarreFret){
+    const bf=state._lastBarreFret;
+    const barreSis=[];
+    for(let si=0;si<(state.tuning||[]).length;si++){
+      const over=state.manualOverrides[si];
+      // Corde dans le barré = override === bf (active) OU override === -1 et elle était candidate
+      // On inclut toutes les cordes qui ont été touchées par le barré :
+      // soit elles ont bf comme frette, soit elles ont -1 (mutées par le barré)
+      if(over===bf||over===-1){
+        barreSis.push(si);
+      }
+    }
+    if(barreSis.length>=2){
+      const sorted=barreSis.sort((a,b)=>a-b);
+      barres.push({fret:bf, fromStr:sorted[0], toStr:sorted[sorted.length-1]});
     }
   }
+
+  // 2. Barrés détectés automatiquement (plusieurs cordes sur même frette > 0)
+  if(!state._lastBarreFret){
+    const byFret={};
+    positions.forEach(([si,f])=>{if(f>0)byFret[f]=(byFret[f]||[]).concat(si);});
+    for(const [fStr,strings] of Object.entries(byFret)){
+      const f=parseInt(fStr);
+      if(strings.length<2)continue;
+      const sorted=[...new Set(strings)].sort((a,b)=>a-b);
+      const minSi=sorted[0],maxSi=sorted[sorted.length-1];
+      if(maxSi-minSi>=1)barres.push({fret:f,fromStr:minSi,toStr:maxSi});
+    }
+  }
+
   return barres;
 }
 
@@ -1080,13 +1096,8 @@ function initSelects(){
   const ro=document.createElement('option');ro.value='';ro.textContent='— Aucun accord —';rSel.appendChild(ro);
   NOTES.forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;rSel.appendChild(o);});
 
-  // Chord type — Personnalisé en premier, puis groupes standards
+  // Chord type — groupes standards uniquement (pas de doublon personnalisé)
   const ctSel=document.getElementById('ctype-sel');
-  // Option personnalisée en tête
-  const ogCust=document.createElement('optgroup');ogCust.label='── Personnalisé ──';
-  const oCust=document.createElement('option');
-  oCust.value='personnalise';oCust.textContent='✎ Personnalisé…';
-  ogCust.appendChild(oCust);ctSel.appendChild(ogCust);
   // Groupes standards
   const _chordGroups=[
     ["Triades",  ["majeur","mineur","5","dim","aug","sus2","sus4"]],
@@ -1422,13 +1433,12 @@ function onCanvasClick(e,isRight){
   const[si,fret,zone]=hit;
   const posMap=Object.fromEntries(state.positions.map(([s,f,n])=>[s,[f,n]]));
 
+  if(zone==='barre'){applyBarre();return;}
   if(zone==='play'&&!isRight){
-    // Tap sur bouton play : jouer la note de cette corde
+    // Toujours jouable — ✕ = suggestion visuelle seulement
     const posMap2=Object.fromEntries(state.positions.map(([s,f,n])=>[s,[f,n]]));
-    if(posMap2[si]){
-      const[f]=posMap2[si];
-      if(f>=0)playMidiNotes([noteToMidi(state.tuning[si])+f],0);
-    }
+    const f=posMap2[si]?.[0]??0; // fret sélectionné ou 0 (note à vide)
+    playMidiNotes([noteToMidi(state.tuning[si])+f],0);
     return;
   } else if(isRight){
     // Clic droit : toujours effacer l'override → revient à la position calculée
@@ -1472,7 +1482,16 @@ const TOUCH_R = hasTouchScreen ? 22 : 12;
 
 function xyToStringFret(x,y,g){
   const{ML,MT,fw,sg,STR_MARGIN,n_str,n_frets,fb_h,fb_w}=g;
+
+  // Zone bouton barré [B] — au-dessus du manche, vérifiée EN PREMIER avant le filtre y
+  const posMin=state.posMin||1;
+  if(y>=MT-24&&y<=MT&&state.tuning.length>0){
+    const xBarre=ML+(posMin-0.5)*fw;
+    if(Math.abs(x-xBarre)<16)return[-1,0,'barre'];
+  }
+
   if(y<MT-TOUCH_R||y>MT+fb_h+TOUCH_R)return null;
+
   let bestSi=null,bestDist=sg*0.6+TOUCH_R*0.5;
   for(let si=0;si<n_str;si++){
     const cy=MT+STR_MARGIN+(n_str-1-si)*sg;
@@ -1481,18 +1500,16 @@ function xyToStringFret(x,y,g){
   }
   if(bestSi===null)return null;
 
-  // Zone bouton PLAY : ML-88 (relatif au ML courant)
-  const btnX=g.small?ML-76:ML-88;
-  if(Math.abs(x-btnX)<TOUCH_R){return[bestSi,0,'play'];}
+  // Zones gauche
+  const btnX=g.btnX||(ML-54);
+  const openX=g.openX||(ML-18);
+  const openR=g.openR||9;
+  const btnR=g.btnR||8;
 
-  // Zone MUTE/VIDE : cercle à ML-70
-  const openX=g.small?ML-58:ML-70;
-  if(Math.abs(x-openX)<TOUCH_R){return[bestSi,0,'open'];}
+  if(Math.abs(x-btnX)<TOUCH_R+btnR*0.5){return[bestSi,0,'play'];}
+  if(Math.abs(x-openX)<TOUCH_R+openR*0.5){return[bestSi,0,'open'];}
+  if(x>=ML-92&&x<=ML){return[bestSi,0,'open'];}
 
-  // Zone ouverte générale
-  if(x>=ML-100&&x<=ML){return[bestSi,0,'open'];}
-
-  // Zone manche : frettes
   if(x>ML&&x<=ML+fb_w){
     const fret=Math.max(1,Math.min(n_frets,Math.floor((x-ML)/fw)+1));
     return[bestSi,fret,'fret'];
@@ -1524,6 +1541,7 @@ function applyOverridesAndRefresh(){
 // ══════════════════════════════════════════════════════════════════
 function computeAndDraw(){
   state.manualOverrides={};
+  state._lastBarreFret=null;
   if(state.instrument==='Aucun'||!state.tuning.length){
     state.positions=[];
     state.cnotes=state.rootNote?buildChord(state.rootNote,state.ctype):[];
@@ -1789,6 +1807,7 @@ document.querySelectorAll('input[name=vis-mobile]').forEach(r=>{
 
 function resetChord(){
   state.manualOverrides={};
+  state._lastBarreFret=null;
   state.posMin=1;
   updatePosLabels();
   computeAndDraw();
@@ -1812,7 +1831,15 @@ function toggleArpDir(){
   document.getElementById('arp-dir-btn').textContent='Arpège '+(arpDir===1?'↑':'↓');
 }
 function playChord(){
-  let midi=state.positions.filter(([,f])=>f>=0).map(([si,f])=>noteToMidi(state.tuning[si])+f);
+  // Jouer toutes les cordes — les ✕ sont des suggestions visuelles, pas des blocages
+  // Les cordes "mutées" (override=-1) sonnent leur note à vide (fret 0)
+  const tuning=state.tuning;
+  const posMap={};state.positions.forEach(([si,f,n])=>posMap[si]=f);
+  // Cordes en position → leur fret ; cordes "mutées" → note à vide (fret 0)
+  let midi=tuning.map((t,si)=>{
+    const f=posMap[si]!==undefined?posMap[si]:0;
+    return noteToMidi(t)+f;
+  });
   if(arpDir===-1)midi=midi.slice().reverse();
   if(midi.length)playMidiNotes(midi,80);
 }
@@ -1833,7 +1860,7 @@ function setupCanvas(id){
   // iOS Safari peut retourner 0 pour clientWidth/Height au premier rendu
   const rawW=scroll.clientWidth||scroll.offsetWidth||window.innerWidth||600;
   const rawH=scroll.clientHeight||scroll.offsetHeight||minH;
-  const W=Math.max(rawW, 92+nFrets*32+24);
+  const W=Math.max(rawW, 90+nFrets*32+24);
   const H=Math.max(rawH, minH);
   cv.style.width=W+'px';
   cv.style.height=H+'px';
@@ -1845,7 +1872,7 @@ function setupCanvas(id){
 }
 
 function getFretboardGeometry(W,H,nStr,nFrets,extraMT){
-  const ML=100, MR=24;  // ML augmenté pour afficher note+octave+référence
+  const ML=90, MR=24;
   const MT=(extraMT||0)+(H<200?32:50);
   const MB=20;
   const STR_MARGIN=8;
@@ -1917,15 +1944,6 @@ function drawStrings(ctx,g,tuning,dbl,thicknesses){
   const{ML,fbH,fbW,fw,MT,sy,n_str,sx}=g;
   const isB5=isBanjo5();
   const sf=isB5?shortStringFret():0;
-  // Mapping note+octave → short reference label
-  const STR_REFS={
-    "E2":"E2 gtr▼","E4":"E4 gtr▲","E1":"E1 basse▼","E5":"E5 vln▲",
-    "A2":"A2 gtr","A4":"A4 440Hz","A1":"A1 basse",
-    "G3":"G3 vln▼","G4":"G4 bnj","G2":"G2 basse▲",
-    "D4":"D4 vln","D3":"D3 gtr","D2":"D2 gtr","D1":"D1 basse",
-    "B0":"B0 basse▼","B3":"B3 gtr","C4":"C4 Do mid",
-    "C2":"C2 oud","C3":"C3 oud",
-  };
   for(let si=0;si<n_str;si++){
     const y=sy(si);
     const isDbl=dbl[si];
@@ -1947,37 +1965,19 @@ function drawStrings(ctx,g,tuning,dbl,thicknesses){
       ctx.fillStyle='#c8a050';ctx.strokeStyle='#f5deb3';ctx.lineWidth=1.5;
       ctx.beginPath();ctx.arc(xStart,y,5,0,Math.PI*2);ctx.fill();ctx.stroke();
     }
-    const realNote=isShort
-      ?NOTES[(noteToMidi(tuning[si])+Math.max(0,state.capo-sf))%12]
-      :NOTES[(noteToMidi(tuning[si])+state.capo)%12];
-    // Full note name with octave for identification
-    const tuningNote=isShort?tuning[si]:tuning[si]; // full note+octave string
+    // Note+octave uniquement — petite, centrée verticalement sur la corde
     const capoAdjNote=isShort
       ?NOTES[(noteToMidi(tuning[si])+Math.max(0,state.capo-sf))%12]+tuning[si].slice(tuning[si].search(/\d/))
-      :(()=>{const m=noteToMidi(tuning[si])+state.capo;return NOTES[m%12]+Math.floor((m)/12-1)})();
-
-    const noteCol=isShort?'#c8a050':isDbl?'#e8d080':'#e8e8f0';
-    const fntStr=g.small?'bold 7px JetBrains Mono,monospace':'bold 9px JetBrains Mono,monospace';
-    const fntRef=g.small?'5px JetBrains Mono,monospace':'6px JetBrains Mono,monospace';
-
-    // Show note name with octave
-    ctx.fillStyle=noteCol;ctx.font=fntStr;
-    ctx.textAlign='right';
+      :(()=>{const m=noteToMidi(tuning[si])+state.capo;return NOTES[m%12]+Math.floor(m/12-1)})();
     const noteWithOct=state.capo===0?tuning[si]:capoAdjNote;
-    ctx.fillText(noteWithOct,ML-48,y+3);
-
-    // Show reference hint below note
-    const refKey=state.capo===0?tuning[si]:capoAdjNote;
-    const refTxt=STR_REFS[refKey];
-    if(refTxt&&!g.small){
-      ctx.fillStyle='#446688';ctx.font=fntRef;
-      ctx.textAlign='right';
-      ctx.fillText(refTxt,ML-48,y+10);
-    }
-
+    const noteCol=isShort?'#c8a050':isDbl?'#e8d080':'#aaaacc';
+    ctx.fillStyle=noteCol;
+    ctx.font=g.small?'bold 6px JetBrains Mono,monospace':'bold 8px JetBrains Mono,monospace';
+    ctx.textAlign='right';
+    ctx.fillText(noteWithOct,Math.round(ML*0.20),y+3);
     if(isShort){
-      ctx.fillStyle='#876030';ctx.font=g.small?'6px JetBrains Mono,monospace':'7px JetBrains Mono,monospace';
-      ctx.textAlign='right';ctx.fillText('(5fr)',ML-48,y+16);
+      ctx.fillStyle='#876030';ctx.font='6px JetBrains Mono,monospace';
+      ctx.textAlign='right';ctx.fillText('(5fr)',Math.round(ML*0.20),y+11);
     }
   }
 }
@@ -2003,195 +2003,262 @@ function draw(){
 
   const tuning=state.tuning,dbl=state.double,nStr=tuning.length;
   const nFrets=state.nFrets,capo=state.capo;
-  const g=getFretboardGeometry(W,H,nStr,nFrets);
-  const{ML,MT,fbH,fbW,fw,sg,sx,sy}=g;
 
-  // Save geo for click detection
-  state.geo={...g,fb_w:fbW,fb_h:fbH};
+  // ── Géométrie dynamique ──
+  // Éléments gauche (de gauche à droite) : [note] gap [▶ play] gap [○ mute] gap [sillet]
+  // Les gaps sont égaux et calculés depuis la largeur disponible
+  const openR=9, btnR=8;
+  // Zone gauche fixe : note(~22px) + 3 gaps + play(r8) + mute(r9)
+  const leftZone=22+8+btnR*2+8+openR*2+8; // ~75px
+  // Ajouter de l'espace si le canvas est large
+  const extraLeft=Math.min(20,Math.max(0,(W-400)*0.04));
+  const ML=Math.round(leftZone+extraLeft);
+  const MR=24;
+  const noteAnchorX=Math.max(18,Math.round(ML*0.18));
+  const btnXf=Math.round(ML*0.40);
+  const openXf=Math.round(ML*0.72);
+
+  const MT=H<200?32:50;
+  const MB=20;
+  const STR_MARGIN=8;
+  const maxFbH=nStr*22+STR_MARGIN*2;
+  const fbH=Math.min(H-MT-MB,maxFbH);
+  const fbW=W-ML-MR;
+  const fw=fbW/nFrets;
+  const sg=(fbH-2*STR_MARGIN)/Math.max(nStr-1,1);
+  const sx=f=>ML+f*fw;
+  const sy=si=>MT+STR_MARGIN+(nStr-1-si)*sg;
+
+  const g={ML,MR,MT,MB,STR_MARGIN,fbH,fbW,fw,sg,sx,sy,
+    n_str:nStr,n_frets:nFrets,fb_h:fbH,fb_w:fbW,small:false,medium:false};
+  state.geo={...g,fb_w:fbW,fb_h:fbH,openX:openXf,btnX:btnXf,openR,btnR,noteAnchorX};
 
   const chordLbl=state.rootNote?`${state.rootNote} ${state.ctype.toUpperCase()}`:'— cordes à vide —';
-
   drawFretboardBase(ctx,W,H,g,null,capo);
 
-  // Titre : accord en grand en haut, instrument en blanc en dessous
-  const titleSz=g.small?'bold 10px':'bold 13px';
-  const subSz=g.small?'bold 9px':'bold 12px';
-  ctx.fillStyle='#00d4ff';ctx.font=`${titleSz} Space Grotesk,sans-serif`;
-  ctx.textAlign='center';ctx.fillText(chordLbl,W/2,g.small?12:16);
-  ctx.fillStyle='#ffffff';ctx.font=`${subSz} Space Grotesk,sans-serif`;
-  ctx.textAlign='center';ctx.fillText(state.instrument,W/2,g.small?22:30);
+  ctx.fillStyle='#00d4ff';ctx.font='bold 13px Space Grotesk,sans-serif';
+  ctx.textAlign='center';ctx.fillText(chordLbl,W/2,16);
+  ctx.fillStyle='#ffffff';ctx.font='bold 11px Space Grotesk,sans-serif';
+  ctx.textAlign='center';ctx.fillText(state.instrument,W/2,30);
 
   const thicknesses=STR_THICK[state.instrument]||tuning.map((_,si)=>Math.max(1,3-si*0.4));
   drawStrings(ctx,g,tuning,dbl,thicknesses);
 
-  // Hint
-  ctx.fillStyle='#333';ctx.font='8px JetBrains Mono,monospace';
-  ctx.textAlign='right';
-  if(!g.small){ctx.fillStyle='#333';ctx.font='8px JetBrains Mono,monospace';ctx.textAlign='right';ctx.fillText('zone ouverte : muter/démuter  |  manche : placer  |  clic droit : réinitialiser',W-g.MR-4,MT-8);}
+  if(!g.small){
+    ctx.fillStyle='#333';ctx.font='8px JetBrains Mono,monospace';ctx.textAlign='right';
+    ctx.fillText('○ muter  |  manche : placer  |  clic droit : reset  |  [B] barré position',W-MR-4,MT-8);
+  }
 
-  const rDotBase=g.small?5:7;
-  const rDot=Math.min(Math.max(fw*0.38,rDotBase),sg*0.38,g.small?12:18);
-  const rSmall=Math.max(g.small?4:6,rDot*0.72);  // plus grand : 72% au lieu de 52%
-  const dotFnt=g.small?'5px JetBrains Mono,monospace':'7px JetBrains Mono,monospace';
-  const dotFntB=g.small?'bold 5px JetBrains Mono,monospace':'bold 7px JetBrains Mono,monospace';
+  // ── Tailles pastilles ──
+  // rPlay : grande, jouée — rOther : même que openR (colonne mute), sans bordure blanche
+  const rPlay=Math.min(Math.max(fw*0.44,9),sg*0.44,22);
+  const fntPlay=`bold ${Math.max(7,Math.round(rPlay*0.62))}px JetBrains Mono,monospace`;
+
   const posMap={};state.positions.forEach(([si,f,n])=>posMap[si]=[f,n]);
   const chordSet=new Set(state.cnotes);
   const isB5=isBanjo5();
   const shortFret=isB5?shortStringFret():0;
-  // Corde courte : le capo ne l'affecte que si capo >= shortFret
   const tuningMidi=tuning.map((t,si)=>(isB5&&si===0)?noteToMidi(t):noteToMidi(t)+capo);
-
-  // ── Pastilles secondaires : toutes les notes de l'accord sur tout le manche ──
-  // Tier 1 — dans la fenêtre Pos (frettes posMin..posMin+3) :
-  //   taille rDot + bord blanc → même mise en valeur que la pastille dominante
-  // Tier 2 — hors fenêtre :
-  //   taille rSmall + bord couleur → visible mais discret
-  // Cordes à vide (f=0) : inchangées (gérées dans les main dots)
-  const dimCols={'#FF3300':'#7a1a00','#22CC44':'#0d5520','#3399FF':'#0a3a7a','#FFD700':'#7a6000','#FF8800':'#7a4000','#FFAA00':'#7a5000','#00CCCC':'#006060','#0099AA':'#004455','#6666FF':'#222288','#AA44FF':'#550088','#CC44AA':'#661155'};
   const posMin=state.posMin||1;
+
+  // ── TIER 2 : notes de l'accord NON jouées ──
+  // Fond plein coloré bien visible, légèrement plus petit que les jouées
+  const rOther=Math.max(openR, Math.round(rPlay*0.72));
+  const fntOther=`bold ${Math.max(6,Math.round(rOther*0.72))}px JetBrains Mono,monospace`;
   for(let si=0;si<nStr;si++){
     const y=sy(si);
-    const isShortDim=isB5&&si===0;
-    const voffDim=isShortDim?Math.max(0,shortFret-capo):0;
-    for(let f=0;f<=nFrets-voffDim;f++){
-      if(!isShortDim&&f===0)continue; // cordes à vide → gérées séparément
+    const isShortS=isB5&&si===0;
+    const voff=isShortS?Math.max(0,shortFret-capo):0;
+    for(let f=isShortS?0:1;f<=nFrets-voff;f++){
       const note=NOTES[(tuningMidi[si]+f)%12];
       if(!chordSet.has(note))continue;
-      if(posMap[si]?.[0]===f)continue; // pastille principale déjà dessinée ici
+      if(posMap[si]?.[0]===f)continue;
       const col=noteRole(note,state.rootNote,state.ctype);
-      const colDim=dimCols[col]||'#555';
-      const inWin=(f>=posMin&&f<=posMin+3);
-      const xd=sx(f+voffDim-0.5);
-      if(inWin){
-        // Tier 1 : dans la fenêtre → pleine taille + bord blanc
-        ctx.fillStyle=colDim;
-        ctx.beginPath();ctx.arc(xd,y,rDot,0,Math.PI*2);ctx.fill();
-        ctx.strokeStyle='#ffffff';ctx.lineWidth=1.5;
-        ctx.beginPath();ctx.arc(xd,y,rDot,0,Math.PI*2);ctx.stroke();
-        ctx.fillStyle=col;ctx.font=dotFntB;
-        ctx.textAlign='center';ctx.fillText(note,xd,y+2);
-      } else {
-        // Tier 2 : hors fenêtre → petit + bord couleur
-        ctx.fillStyle=colDim;
-        ctx.beginPath();ctx.arc(xd,y,rSmall,0,Math.PI*2);ctx.fill();
-        ctx.strokeStyle=col;ctx.lineWidth=1;
-        ctx.beginPath();ctx.arc(xd,y,rSmall,0,Math.PI*2);ctx.stroke();
-        ctx.fillStyle=col;ctx.font=dotFnt;
-        ctx.textAlign='center';ctx.fillText(note,xd,y+2);
-      }
+      const xd=f===0?sx(voff):sx(f+voff-0.5);
+      ctx.globalAlpha=0.72;
+      ctx.fillStyle=col;
+      ctx.beginPath();ctx.arc(xd,y,rOther,0,Math.PI*2);ctx.fill();
+      ctx.globalAlpha=1;
+      ctx.fillStyle='#fff';ctx.font=fntOther;
+      ctx.textAlign='center';ctx.fillText(note,xd,y+2);
     }
   }
 
-  // Cercle "à vide" cliquable — à ML-70
+  // ── Cercle marge (mute/vide) — openXf ──
+  // Logique : note à vide dans accord → ○ vert
+  //           note à vide hors accord → ✕
+  //           note sélectionnée frette>0 dans accord → cercle neutre
+  //           note sélectionnée frette>0 hors accord → ✕
+  //           override=-1 (muet explicite) → ✕
   for(let si=0;si<nStr;si++){
     const y=sy(si);
-    const isShort=isB5&&si===0;
-    if(isShort)continue;
-    const isMuted=posMap[si]===undefined;
-    const isFretZero=posMap[si]?.[0]===0;
-    const openR=g.small?5:7;
-    const openX=g.small?ML-58:ML-70;
-    ctx.fillStyle=isFretZero?'#1a2a1a':isMuted?'#2a1a1a':'rgba(255,255,255,0.04)';
-    ctx.strokeStyle=isFretZero?'#2ecc71':isMuted?'#e74c3c':'rgba(255,255,255,0.25)';
+    if(isB5&&si===0)continue;
+
+    const over=state.manualOverrides[si];
+    const selEntry=posMap[si];           // [fret,note] si sélectionné
+    const selFret=selEntry?.[0];
+    const selNote=selEntry?.[1];
+    const openNote=NOTES[tuningMidi[si]%12];
+    const openInChord=chordSet.size===0||chordSet.has(openNote);
+
+    let showCross=false;
+    let isFretZero=false;
+
+    if(over===-1){
+      // Muet explicite → ✕
+      showCross=true;
+    } else if(selFret===0){
+      // Note à vide sélectionnée
+      isFretZero=true;
+      showCross=!openInChord;
+    } else if(selFret>0){
+      // Note sur frette sélectionnée : ✕ si hors accord
+      showCross=chordSet.size>0&&!chordSet.has(selNote);
+    } else {
+      // Pas de sélection : ✕ si note à vide hors accord
+      showCross=!openInChord;
+    }
+
+    ctx.fillStyle=isFretZero?'#1a2a1a':showCross?'#2a1a1a':'rgba(255,255,255,0.04)';
+    ctx.strokeStyle=isFretZero?'#2ecc71':showCross?'#e74c3c':'rgba(255,255,255,0.2)';
     ctx.lineWidth=1.5;
-    ctx.beginPath();ctx.arc(openX,y,openR,0,Math.PI*2);ctx.fill();ctx.stroke();
-    if(isMuted){
-      ctx.fillStyle='#e74c3c';ctx.font='bold 9px Arial';
-      ctx.textAlign='center';ctx.fillText('✕',openX,y+3);
+    ctx.beginPath();ctx.arc(openXf,y,openR,0,Math.PI*2);ctx.fill();ctx.stroke();
+    if(showCross){
+      ctx.fillStyle='#e74c3c';ctx.font=`bold ${openR+1}px Arial`;
+      ctx.textAlign='center';ctx.fillText('✕',openXf,y+3);
     } else {
       ctx.strokeStyle=isFretZero?'#2ecc71':'rgba(255,255,255,0.3)';ctx.lineWidth=1.5;
-      ctx.beginPath();ctx.arc(openX,y,5,0,Math.PI*2);ctx.stroke();
+      ctx.beginPath();ctx.arc(openXf,y,openR*0.5,0,Math.PI*2);ctx.stroke();
     }
   }
 
-  // ── BARRÉS ──
+  // ── BARRÉS existants ──
   const barres=detectBarres(state.positions);
   for(const barre of barres){
     const{fret,fromStr,toStr}=barre;
-    const isB5b=isBanjo5();
-    const shortFretB=isB5b?shortStringFret():0;
-    const voffB=0; // barrés toujours sur cordes normales
-    const xb=sx(fret+voffB-0.5);
-    const yTop=sy(toStr);   // toStr = plus aigu = haut visuellement
-    const yBot=sy(fromStr); // fromStr = plus grave = bas visuellement
-    const rB=rDot*1.05;
-    // Rectangle arrondi du barré (bande verticale)
-    ctx.save();
-    ctx.globalAlpha=0.55;
-    ctx.fillStyle='#8855ff';
-    ctx.strokeStyle='#bb88ff';
-    ctx.lineWidth=1.5;
-    const bw=rB*2;
-    const bh=yBot-yTop+rB*2;
-    const bx=xb-rB, by=yTop-rB;
-    const br=rB;
+    const xb=sx(fret-0.5);
+    const yTop=sy(toStr),yBot=sy(fromStr);
+    const rB=rPlay*1.05;
+    ctx.save();ctx.globalAlpha=0.5;
+    ctx.fillStyle='#8855ff';ctx.strokeStyle='#bb88ff';ctx.lineWidth=1.5;
+    const bw=rB*2,bh=yBot-yTop+rB*2,bx=xb-rB,by=yTop-rB,br=rB;
     ctx.beginPath();
     ctx.moveTo(bx+br,by);ctx.lineTo(bx+bw-br,by);ctx.quadraticCurveTo(bx+bw,by,bx+bw,by+br);
     ctx.lineTo(bx+bw,by+bh-br);ctx.quadraticCurveTo(bx+bw,by+bh,bx+bw-br,by+bh);
     ctx.lineTo(bx+br,by+bh);ctx.quadraticCurveTo(bx,by+bh,bx,by+bh-br);
     ctx.lineTo(bx,by+br);ctx.quadraticCurveTo(bx,by,bx+br,by);ctx.closePath();
-    ctx.fill();ctx.stroke();
-    ctx.restore();
-    // Label "B" + numéro de frette
-    ctx.save();
-    ctx.fillStyle='#dd99ff';
-    ctx.font='bold 8px JetBrains Mono,monospace';
-    ctx.textAlign='center';
-    ctx.fillText('B'+fret, xb, yTop-rB-3);
-    ctx.restore();
+    ctx.fill();ctx.stroke();ctx.restore();
+    ctx.fillStyle='#dd99ff';ctx.font='bold 8px JetBrains Mono,monospace';
+    ctx.textAlign='center';ctx.fillText('B'+fret,xb,yTop-rB-3);
   }
 
-  // Main dots
+  // ── Bouton barré — toggle, surbrillance si actif ──
+  if(state.tuning.length>0){
+    const xBarre=sx(posMin-0.5);
+    const yBarre=MT-14;
+    const barreActive=(state._lastBarreFret===posMin);
+    ctx.fillStyle=barreActive?'#6622bb':'#221133';
+    ctx.strokeStyle=barreActive?'#cc88ff':'#8855ff';
+    ctx.lineWidth=barreActive?2:1;
+    const bw=24,bh=15;
+    ctx.beginPath();ctx.roundRect?ctx.roundRect(xBarre-bw/2,yBarre-bh/2,bw,bh,4):ctx.rect(xBarre-bw/2,yBarre-bh/2,bw,bh);
+    ctx.fill();ctx.stroke();
+    if(barreActive){
+      ctx.shadowColor='#aa66ff';ctx.shadowBlur=6;
+      ctx.fillStyle='#ffffff';
+    } else {
+      ctx.fillStyle='#cc88ff';
+    }
+    ctx.font='bold 9px JetBrains Mono,monospace';
+    ctx.textAlign='center';ctx.fillText('B'+posMin,xBarre,yBarre+3);
+    ctx.shadowBlur=0;
+  }
+
+  // ── TIER 1 : pastilles JOUÉES ──
+  const voffM_fn=si=>(isB5&&si===0)?Math.max(0,shortFret-capo):0;
   for(let si=0;si<nStr;si++){
     const y=sy(si);
+    const voffM=voffM_fn(si);
     const isShort=isB5&&si===0;
-    const btnX=g.small?ML-76:ML-88;  // bouton play (ML-88 relatif à ML=100)
-    const btnR=9;
     const inPos=posMap[si]!==undefined;
 
-    // Play button per string
-    ctx.strokeStyle=inPos?'#2ecc71':'#555';ctx.lineWidth=1;
-    ctx.fillStyle=inPos?'#1a2a1a':'#1a1a1a';
-    ctx.beginPath();ctx.arc(btnX,y,7,0,Math.PI*2);ctx.fill();ctx.stroke();
-    ctx.fillStyle=inPos?'#2ecc71':'#555';ctx.font='7px Arial';
-    ctx.textAlign='center';ctx.fillText('▶',btnX+1,y+2);
+    // ▶ Bouton play — toujours actif (les ✕ sont visuels, pas sonores)
+    ctx.strokeStyle='#2ecc71';ctx.lineWidth=1.2;
+    ctx.fillStyle='#0d1f0d';
+    ctx.beginPath();ctx.arc(btnXf,y,btnR,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.fillStyle='#2ecc71';ctx.font='8px Arial';
+    ctx.textAlign='center';ctx.fillText('▶',btnXf+1,y+3);
 
-    if(!posMap[si]){
-      // Corde muette — croix (×) à ML-70
-      const cx=ML-70,cy=y,cr=rDot*0.65;
-      ctx.strokeStyle='#e74c3c';ctx.lineWidth=2;
-      ctx.beginPath();ctx.moveTo(cx-cr,cy-cr);ctx.lineTo(cx+cr,cy+cr);ctx.stroke();
-      ctx.beginPath();ctx.moveTo(cx-cr,cy+cr);ctx.lineTo(cx+cr,cy-cr);ctx.stroke();
-      continue;
-    }
+    if(!posMap[si])continue;
+
     const[fret,note]=posMap[si];
     const dotCol=noteRole(note,state.rootNote,state.ctype);
     const isRoot=dotCol==='#FF3300',isThird=dotCol==='#22CC44',isFifth=dotCol==='#3399FF';
-    const voffM=isShort?Math.max(0,shortFret-capo):0;
 
     if(fret===0&&!isShort){
-      // Corde normale à vide : pastille dans le cercle à vide (ML-70)
-      const r2=rDot*0.65,x2=ML-70;
-      ctx.fillStyle=isRoot?dotCol:(capo>0?dotCol:'');
-      ctx.strokeStyle=isRoot?'#fff':dotCol;ctx.lineWidth=2;
-      ctx.beginPath();ctx.arc(x2,y,r2,0,Math.PI*2);
-      if(capo===0&&!isRoot){ctx.stroke();}else{ctx.fill();ctx.stroke();}
-      ctx.fillStyle=(isRoot||capo>0)?'#fff':dotCol;ctx.font=dotFntB;
+      // Corde à vide jouée : pastille dans le cercle ouvert
+      const x2=openXf;
+      ctx.fillStyle=dotCol;
+      ctx.beginPath();ctx.arc(x2,y,openR,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#fff';ctx.font=fntPlay;
       ctx.textAlign='center';ctx.fillText(note,x2,y+2);
     } else if(fret+voffM<=nFrets){
-      // Position visuelle = fret musical + offset visuel
       const xd=fret===0?sx(voffM):sx(fret+voffM-0.5);
-      const rd=rDot*(isRoot?1.2:isThird?1.05:1);
-      const ring=isRoot?'#fff':isThird?'#ffdd88':isFifth?'#88aaff':'#333';
+      const rd=rPlay*(isRoot?1.18:isThird?1.05:1);
+      ctx.shadowColor=dotCol;ctx.shadowBlur=isRoot?12:6;
       ctx.fillStyle=dotCol;
       ctx.beginPath();ctx.arc(xd,y,rd,0,Math.PI*2);ctx.fill();
-      ctx.strokeStyle=ring;ctx.lineWidth=isRoot?2:1;
+      ctx.shadowBlur=0;
+      const ring=isRoot?'#fff':isThird?'#ffee99':isFifth?'#aaccff':'#ffffffaa';
+      ctx.strokeStyle=ring;ctx.lineWidth=isRoot?2.5:1.5;
       ctx.beginPath();ctx.arc(xd,y,rd,0,Math.PI*2);ctx.stroke();
-      ctx.fillStyle=isRoot?'#fff':'#000';
-      ctx.font=isRoot?dotFntB:dotFnt;
+      ctx.fillStyle='#fff';ctx.font=fntPlay;
       ctx.textAlign='center';ctx.fillText(note,xd,y+2);
     }
   }
+}
+
+// Applique un barré à la position courante (posMin) :
+// - Cordes avec note déjà à frette > posMin → inchangées
+// - Cordes dont la note à posMin EST dans l'accord → assigner posMin
+// - Cordes dont la note à posMin N'EST PAS dans l'accord → muter (✕)
+function applyBarre(){
+  const posMin=state.posMin||1;
+  const isB5=isBanjo5();
+  const capo=state.capo;
+  const tuning=state.tuning;
+  if(!tuning.length)return;
+
+  // Toggle : si le barré est déjà posé à cette frette → l'enlever et recalculer
+  if(state._lastBarreFret===posMin){
+    state._lastBarreFret=null;
+    state.manualOverrides={};  // reset tous les overrides
+    computeAndDraw();
+    return;
+  }
+
+  // Poser le barré : cordes à posMin si note dans l'accord, mutées sinon
+  // (sauf cordes avec frette > posMin qui restent inchangées)
+  const tuningMidi=tuning.map((t,si)=>(isB5&&si===0)?noteToMidi(t):noteToMidi(t)+capo);
+  const chordSet=new Set(state.cnotes);
+  const posMap={};state.positions.forEach(([si,f,n])=>posMap[si]=[f,n]);
+  state._lastBarreFret=posMin;
+
+  for(let si=0;si<tuning.length;si++){
+    if(isB5&&si===0)continue;
+    const curFret=posMap[si]?.[0];
+    // Corde avec note déjà à une frette > posMin → on la laisse
+    if(curFret!==undefined&&curFret>posMin)continue;
+    const noteAtBarre=NOTES[(tuningMidi[si]+posMin)%12];
+    if(chordSet.size===0||chordSet.has(noteAtBarre)){
+      // Note dans l'accord (ou pas d'accord sélectionné) → barré actif
+      state.manualOverrides[si]=posMin;
+    } else {
+      // Note hors accord → muter
+      state.manualOverrides[si]=-1;
+    }
+  }
+  applyOverridesAndRefresh();
 }
 
 // ── GAMME / MODE GENERIC DRAW ──
