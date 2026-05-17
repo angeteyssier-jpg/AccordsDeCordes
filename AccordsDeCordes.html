@@ -191,11 +191,12 @@ select:focus{border-color:var(--accent)}
 /* iOS : forcer recalcul après unhide */
 .neck-wrap:not(.hidden){display:flex!important;}
 .neck-label{
-  display:flex;align-items:center;gap:8px;
-  padding:4px 12px 0;
-  font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;
-  flex-shrink:0;
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+  padding:5px 10px;min-height:36px;
+  font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;
+  flex-shrink:0;background:rgba(0,0,0,0.18);border-bottom:1px solid #1a2233;
 }
+.neck-label::-webkit-scrollbar{display:none;}
 .neck-label.accord{color:var(--accent)}
 .neck-label.gamme{color:#88cc88}
 .neck-label.mode{color:#88aaff}
@@ -421,28 +422,59 @@ select option{background:#1a1a2c}
     <!-- CANVAS AREA -->
     <div id="canvas-area">
       <div class="neck-wrap" id="wrap-accord">
-        <div class="neck-label accord" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        <div class="neck-label accord">
           <span>● ACCORD</span>
-          <button onclick="resetChord()" title="Réinitialiser l'accord" style="background:transparent;border:1px solid #334;color:#6688aa;font-family:'JetBrains Mono',monospace;font-size:9px;padding:2px 7px;border-radius:4px;cursor:pointer;touch-action:manipulation" onmouseover="this.style.borderColor='#00d4ff'" onmouseout="this.style.borderColor='#334'">↺ reset</button>
-          <span style="color:#555;font-size:9px">|</span>
-          <button onclick="guessChordName()" title="Deviner le nom de l'accord" id="guess-btn" style="background:#0d1a2a;border:1px solid #3355aa;color:#88aaff;font-family:'JetBrains Mono',monospace;font-size:9px;padding:2px 7px;border-radius:4px;cursor:pointer;touch-action:manipulation" onmouseover="this.style.borderColor='#88aaff'" onmouseout="this.style.borderColor='#3355aa'">🎵 Nom ?</button>
+          <button onclick="resetChord()" style="background:transparent;border:1px solid #334;color:#6688aa;font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;border-radius:4px;cursor:pointer;touch-action:manipulation">↺ reset</button>
+          <button onclick="guessChordName()" id="guess-btn" style="background:#0d1a2a;border:1px solid #3355aa;color:#88aaff;font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;border-radius:4px;cursor:pointer;touch-action:manipulation">🎵 Nom ?</button>
           <span id="guess-result" style="font-size:10px;color:#ffcc44;font-family:'JetBrains Mono',monospace;display:none"></span>
-          <span style="color:#555;font-size:9px">|</span>
-          <span style="font-size:9px;color:#88aaff;font-family:'JetBrains Mono',monospace">Position:</span>
-          <button onclick="changePosMin(-1)" style="background:#0d1526;border:1px solid #334;color:#88aaff;font-family:'JetBrains Mono',monospace;font-size:11px;width:22px;height:22px;border-radius:3px;cursor:pointer;touch-action:manipulation;padding:0;line-height:1">◀</button>
-          <span id="pos-min-lbl" style="font-size:11px;color:#00d4ff;font-family:'JetBrains Mono',monospace;min-width:20px;text-align:center">1</span>
-          <button onclick="changePosMin(1)" style="background:#0d1526;border:1px solid #334;color:#88aaff;font-family:'JetBrains Mono',monospace;font-size:11px;width:22px;height:22px;border-radius:3px;cursor:pointer;touch-action:manipulation;padding:0;line-height:1">▶</button>
+          <div style="width:100%;height:0"></div>
+          <span style="font-size:10px;color:#88aaff;font-family:'JetBrains Mono',monospace">Début:</span>
+          <button onclick="changePosMin(-1)" style="background:#0d1526;border:1px solid #334;color:#88aaff;font-family:'JetBrains Mono',monospace;font-size:13px;width:26px;height:26px;border-radius:3px;cursor:pointer;touch-action:manipulation;padding:0;line-height:1">◀</button>
+          <span id="pos-min-lbl" style="font-size:13px;color:#00d4ff;font-family:'JetBrains Mono',monospace;min-width:22px;text-align:center">1</span>
+          <button onclick="changePosMin(1)" style="background:#0d1526;border:1px solid #334;color:#88aaff;font-family:'JetBrains Mono',monospace;font-size:13px;width:26px;height:26px;border-radius:3px;cursor:pointer;touch-action:manipulation;padding:0;line-height:1">▶</button>
+          <span style="color:#444;font-size:10px">|</span>
+          <span style="font-size:10px;color:#88aaff;font-family:'JetBrains Mono',monospace">Fin:</span>
+          <button onclick="changePosMax(-1)" style="background:#0d1526;border:1px solid #334;color:#88aaff;font-family:'JetBrains Mono',monospace;font-size:13px;width:26px;height:26px;border-radius:3px;cursor:pointer;touch-action:manipulation;padding:0;line-height:1">◀</button>
+          <span id="pos-max-lbl" style="font-size:13px;color:#00d4ff;font-family:'JetBrains Mono',monospace;min-width:22px;text-align:center">4</span>
+          <button onclick="changePosMax(1)" style="background:#0d1526;border:1px solid #334;color:#88aaff;font-family:'JetBrains Mono',monospace;font-size:13px;width:26px;height:26px;border-radius:3px;cursor:pointer;touch-action:manipulation;padding:0;line-height:1">▶</button>
+          <button id="pos-lock-btn" onclick="togglePosLock()" title="Bloquer l'écart" style="background:#0d1526;border:1px solid #334;color:#888;font-family:'JetBrains Mono',monospace;font-size:12px;width:26px;height:26px;border-radius:3px;cursor:pointer;touch-action:manipulation;padding:0;line-height:1">🔒</button>
         </div>
         <div class="neck-scroll" id="scroll-cv-accord"><canvas id="cv-accord"></canvas></div>
       </div>
       <div class="divider" id="div1"></div>
       <div class="neck-wrap" id="wrap-gamme">
-        <div class="neck-label gamme">● GAMME</div>
+        <div class="neck-label gamme">
+          <span>● GAMME</span>
+          <span style="color:#444;font-size:10px">|</span>
+          <span style="font-size:10px;color:#88cc88;font-family:'JetBrains Mono',monospace">Début:</span>
+          <button onclick="changeScaleRange('scale','start',-1)" style="background:#0d1526;border:1px solid #334;color:#88cc88;font-family:'JetBrains Mono',monospace;font-size:13px;width:26px;height:26px;border-radius:3px;cursor:pointer;padding:0;line-height:1">◀</button>
+          <span id="scale-start-lbl" style="font-size:13px;color:#00d4ff;font-family:'JetBrains Mono',monospace;min-width:24px;text-align:center">-1</span>
+          <button onclick="changeScaleRange('scale','start',1)" style="background:#0d1526;border:1px solid #334;color:#88cc88;font-family:'JetBrains Mono',monospace;font-size:13px;width:26px;height:26px;border-radius:3px;cursor:pointer;padding:0;line-height:1">▶</button>
+          <span style="color:#444;font-size:10px">|</span>
+          <span style="font-size:10px;color:#88cc88;font-family:'JetBrains Mono',monospace">Fin:</span>
+          <button onclick="changeScaleRange('scale','end',-1)" style="background:#0d1526;border:1px solid #334;color:#88cc88;font-family:'JetBrains Mono',monospace;font-size:13px;width:26px;height:26px;border-radius:3px;cursor:pointer;padding:0;line-height:1">◀</button>
+          <span id="scale-end-lbl" style="font-size:13px;color:#00d4ff;font-family:'JetBrains Mono',monospace;min-width:24px;text-align:center">25</span>
+          <button onclick="changeScaleRange('scale','end',1)" style="background:#0d1526;border:1px solid #334;color:#88cc88;font-family:'JetBrains Mono',monospace;font-size:13px;width:26px;height:26px;border-radius:3px;cursor:pointer;padding:0;line-height:1">▶</button>
+          <button id="scale-lock-btn" onclick="toggleScaleLock('scale')" title="Bloquer l'écart" style="background:#0d1526;border:1px solid #334;color:#888;font-family:'JetBrains Mono',monospace;font-size:12px;width:26px;height:26px;border-radius:3px;cursor:pointer;padding:0;line-height:1">🔒</button>
+        </div>
         <div class="neck-scroll" id="scroll-cv-gamme"><canvas id="cv-gamme"></canvas></div>
       </div>
       <div class="divider" id="div2"></div>
       <div class="neck-wrap" id="wrap-mode">
-        <div class="neck-label mode">● MODE</div>
+        <div class="neck-label mode">
+          <span>● MODE</span>
+          <span style="color:#444;font-size:10px">|</span>
+          <span style="font-size:10px;color:#88aaff;font-family:'JetBrains Mono',monospace">Début:</span>
+          <button onclick="changeScaleRange('mode','start',-1)" style="background:#0d1526;border:1px solid #334;color:#88aaff;font-family:'JetBrains Mono',monospace;font-size:13px;width:26px;height:26px;border-radius:3px;cursor:pointer;padding:0;line-height:1">◀</button>
+          <span id="mode-start-lbl" style="font-size:13px;color:#00d4ff;font-family:'JetBrains Mono',monospace;min-width:24px;text-align:center">-1</span>
+          <button onclick="changeScaleRange('mode','start',1)" style="background:#0d1526;border:1px solid #334;color:#88aaff;font-family:'JetBrains Mono',monospace;font-size:13px;width:26px;height:26px;border-radius:3px;cursor:pointer;padding:0;line-height:1">▶</button>
+          <span style="color:#444;font-size:10px">|</span>
+          <span style="font-size:10px;color:#88aaff;font-family:'JetBrains Mono',monospace">Fin:</span>
+          <button onclick="changeScaleRange('mode','end',-1)" style="background:#0d1526;border:1px solid #334;color:#88aaff;font-family:'JetBrains Mono',monospace;font-size:13px;width:26px;height:26px;border-radius:3px;cursor:pointer;padding:0;line-height:1">◀</button>
+          <span id="mode-end-lbl" style="font-size:13px;color:#00d4ff;font-family:'JetBrains Mono',monospace;min-width:24px;text-align:center">25</span>
+          <button onclick="changeScaleRange('mode','end',1)" style="background:#0d1526;border:1px solid #334;color:#88aaff;font-family:'JetBrains Mono',monospace;font-size:13px;width:26px;height:26px;border-radius:3px;cursor:pointer;padding:0;line-height:1">▶</button>
+          <button id="mode-lock-btn" onclick="toggleScaleLock('mode')" title="Bloquer l'écart" style="background:#0d1526;border:1px solid #334;color:#888;font-family:'JetBrains Mono',monospace;font-size:12px;width:26px;height:26px;border-radius:3px;cursor:pointer;padding:0;line-height:1">🔒</button>
+        </div>
         <div class="neck-scroll" id="scroll-cv-mode"><canvas id="cv-mode"></canvas></div>
       </div>
     </div>
@@ -891,7 +923,11 @@ let state={
   capo:0,
   positions:[],
   cnotes:[],
-  posMin:1,       // position minimale (1=position ouverte, 2=frettes 2-5...)
+  posMin:1,       // position minimale
+  posMax:4,       // position maximale (fenêtre posMin..posMax)
+  posLock:false,  // verrouiller l'écart posMax-posMin
+  scaleStart:-1, scaleEnd:25, scaleLock:false,
+  modeStart:-1,  modeEnd:25,  modeLock:false,
   manualOverrides:{},
   colorMode:"full",
   timbre:"Guitare nylon",
@@ -959,19 +995,15 @@ function getShortInfo(){
 // ── Pas de DB statique — algorithme universel pour tous instruments ──
 
 
-function findPositions(tuning,chordNotes,capo,posMin=1){
-  // Algorithme universel — fonctionne pour tous les instruments et accordages
-  // posMin=1 : frettes 1-4 + cordes à vide
-  // posMin=N : frettes N à N+3 + cordes à vide (toujours)
+function findPositions(tuning,chordNotes,capo,posMin=1,posMax=null){
   const cs=new Set(chordNotes);
   const isB5fp=isBanjo5();
   const result={};
+  const winMax=posMax!==null?posMax:(posMin+3);
 
-  // Cordes à vide (f=0) : toujours autorisées quelle que soit la position
-  // Frettes : fenêtre de 4 frettes à partir de posMin (min 1)
   function inWindow(f){
-    if(f===0) return true;  // corde à vide : toujours OK
-    return f>=posMin&&f<=posMin+3;
+    if(f===0) return true;
+    return f>=posMin&&f<=winMax;
   }
 
   // Passe 1 : assigner chaque note à la meilleure corde dans la fenêtre
@@ -1300,7 +1332,7 @@ document.getElementById('capo-sel').addEventListener('change',e=>{
 });
 document.getElementById('root-sel').addEventListener('change',e=>{
   state.rootNote=e.target.value||null;
-  state.posMin=1;
+  state.posMin=1;state.posMax=4;
   // Rafraîchir les noms de notes dans le builder personnalisé
   if(state.ctype==='personnalise') initCustomChordBuilder();
   computeAndDraw();
@@ -1342,7 +1374,7 @@ function initCustomChordBuilder(){
       const ivSorted=[..._customIntervals].sort((a,b)=>a-b);
       CHORD_FORMULAS['personnalise'][0]=ivSorted;
       state.ctype='personnalise';
-      state.cnotes=buildChord(state.rootNote,state.ctype);state.posMin=1;
+      state.cnotes=buildChord(state.rootNote,state.ctype);state.posMin=1;state.posMax=4;
       computeAndDraw();
     });
   });
@@ -1368,7 +1400,7 @@ document.getElementById('ctype-sel').addEventListener('change',e=>{
     showCustomBuilder(false);
   }
   state.ctype=val;
-  state.posMin=1;
+  state.posMin=1;state.posMax=4;
   computeAndDraw();
 });
 document.getElementById('scale-sel').addEventListener('change',e=>{
@@ -1568,7 +1600,7 @@ function computeAndDraw(){
     });
   } else {
     state.cnotes=buildChord(state.rootNote,state.ctype);
-    state.positions=findPositions(state.tuning,state.cnotes,state.capo,state.posMin);
+    state.positions=findPositions(state.tuning,state.cnotes,state.capo,state.posMin,state.posMax||4);
     // Capo >= sf : corde courte sonne plus haut à vide
     // Si la nouvelle note à vide n'est pas dans l'accord → la corde est muette
     if(isBanjo5()&&state.capo>=sfCad){
@@ -1817,7 +1849,8 @@ document.querySelectorAll('input[name=vis-mobile]').forEach(r=>{
 function resetChord(){
   state.manualOverrides={};
   state._lastBarreFret=null;
-  state.posMin=1;
+  state.posMin=1;state.posMax=4;
+  state.posMax=4;
   updatePosLabels();
   computeAndDraw();
 }
@@ -1825,13 +1858,81 @@ function resetChord(){
 function updatePosLabels(){
   const pl=document.getElementById('pos-min-lbl');
   if(pl)pl.textContent=state.posMin||1;
+  const pm=document.getElementById('pos-max-lbl');
+  if(pm)pm.textContent=state.posMax||4;
+}
+
+function togglePosLock(){
+  state.posLock=!state.posLock;
+  const b=document.getElementById('pos-lock-btn');
+  if(b){b.style.borderColor=state.posLock?'#ffcc44':'#334';b.style.color=state.posLock?'#ffcc44':'#888';}
+}
+
+function _applyBarreOrRecompute(){
+  if(state._lastBarreFret!=null){
+    state._lastBarreFret=null;state.manualOverrides={};
+    computeAndDraw();applyBarre();
+  } else {
+    state.manualOverrides={};computeAndDraw();
+  }
+}
+
+function changePosMax(delta){
+  const span=(state.posMax||4)-(state.posMin||1);
+  const newMax=Math.max((state.posMin||1)+1,Math.min(22,(state.posMax||4)+delta));
+  state.posMax=newMax;
+  if(state.posLock)state.posMin=Math.max(1,newMax-span);
+  updatePosLabels();_applyBarreOrRecompute();
 }
 
 function changePosMin(delta){
-  state.posMin=Math.max(1,Math.min(18,(state.posMin||1)+delta));
-  state.manualOverrides={};
-  updatePosLabels();
-  computeAndDraw();
+  const span=(state.posMax||4)-(state.posMin||1);
+  const newMin=Math.max(1,Math.min((state.posMax||4)-1,(state.posMin||1)+delta));
+  state.posMin=newMin;
+  if(state.posLock)state.posMax=Math.min(22,newMin+span);
+  updatePosLabels();_applyBarreOrRecompute();
+}
+
+function updateScaleLabels(){
+  const ss=state.scaleStart,se=state.scaleEnd;
+  const ms=state.modeStart, me=state.modeEnd;
+  const el=id=>document.getElementById(id);
+  if(el('scale-start-lbl'))el('scale-start-lbl').textContent=ss;
+  if(el('scale-end-lbl'))  el('scale-end-lbl').textContent=se;
+  if(el('mode-start-lbl')) el('mode-start-lbl').textContent=ms;
+  if(el('mode-end-lbl'))   el('mode-end-lbl').textContent=me;
+  // Surbrillance boutons lock
+  ['scale-lock-btn','mode-lock-btn'].forEach(id=>{
+    const b=el(id);if(!b)return;
+    const locked=(id==='scale-lock-btn')?state.scaleLock:state.modeLock;
+    b.style.borderColor=locked?'#ffcc44':'#334';
+    b.style.color=locked?'#ffcc44':'#888';
+  });
+}
+
+// which = 'scale' ou 'mode' ; end = 'start' ou 'end'
+function changeScaleRange(which,end,delta){
+  const startKey=which+'Start', endKey=which+'End', lockKey=which+'Lock';
+  const locked=state[lockKey];
+  if(end==='start'){
+    const span=state[endKey]-state[which+'Start'];
+    const newStart=Math.max(-1,Math.min(state[endKey]-2,state[startKey]+delta));
+    state[startKey]=newStart;
+    if(locked)state[endKey]=Math.min((state.nFrets||22)+1,newStart+span);
+  } else {
+    const span=state[endKey]-state[startKey];
+    const newEnd=Math.max(state[startKey]+2,Math.min((state.nFrets||22)+1,state[endKey]+delta));
+    state[endKey]=newEnd;
+    if(locked)state[startKey]=Math.max(-1,newEnd-span);
+  }
+  updateScaleLabels();
+  if(which==='scale')drawScale(); else drawMode();
+}
+
+function toggleScaleLock(which){
+  const lockKey=which+'Lock';
+  state[lockKey]=!state[lockKey];
+  updateScaleLabels();
 }
 
 let arpDir=1; // 1=montant, -1=descendant
@@ -2059,21 +2160,26 @@ function draw(){
   }
 
   // ── Tailles pastilles ──
-  // rPlay : grande, jouée — rOther : même que openR (colonne mute), sans bordure blanche
+  const posMin=state.posMin||1;
+  const posMax=state.posMax||4;
+
+  // Tailles selon fenêtre posMin..posMax
   const rPlay=Math.min(Math.max(fw*0.44,9),sg*0.44,22);
-  const fntPlay=`bold ${Math.max(7,Math.round(rPlay*0.62))}px JetBrains Mono,monospace`;
+  const rSmall=Math.max(5,Math.round(rPlay*0.55));
+  const fntPlay=`bold ${Math.max(9,Math.round(rPlay*0.72))}px JetBrains Mono,monospace`;
+  const fntSmall=`bold ${Math.max(7,Math.round(rSmall*0.82))}px JetBrains Mono,monospace`;
+
+  const rOther=openR;
+  const fntOther=`bold ${Math.max(8,Math.round(rOther*0.82))}px JetBrains Mono,monospace`;
 
   const posMap={};state.positions.forEach(([si,f,n])=>posMap[si]=[f,n]);
   const chordSet=new Set(state.cnotes);
   const isB5=isBanjo5();
   const shortFret=isB5?shortStringFret():0;
   const tuningMidi=tuning.map((t,si)=>(isB5&&si===0)?noteToMidi(t):noteToMidi(t)+capo);
-  const posMin=state.posMin||1;
 
   // ── TIER 2 : notes de l'accord NON jouées ──
-  // Fond plein coloré bien visible, légèrement plus petit que les jouées
-  const rOther=Math.max(openR, Math.round(rPlay*0.72));
-  const fntOther=`bold ${Math.max(6,Math.round(rOther*0.72))}px JetBrains Mono,monospace`;
+  // Grande dans la fenêtre posMin..posMax, petite hors fenêtre
   for(let si=0;si<nStr;si++){
     const y=sy(si);
     const isShortS=isB5&&si===0;
@@ -2082,14 +2188,19 @@ function draw(){
       const note=NOTES[(tuningMidi[si]+f)%12];
       if(!chordSet.has(note))continue;
       if(posMap[si]?.[0]===f)continue;
+      const fAbs=f+voff;
+      const inWin=(fAbs>=posMin&&fAbs<=posMax)||(f===0);
       const col=noteRole(note,state.rootNote,state.ctype);
-      const xd=f===0?sx(voff):sx(f+voff-0.5);
-      ctx.globalAlpha=0.72;
+      const xd=f===0?sx(voff):sx(fAbs-0.5);
+      const r=inWin?rPlay*0.72:rSmall*0.6;
+      const fnt=inWin?fntOther:fntSmall;
+      ctx.globalAlpha=inWin?0.72:0.35;
       ctx.fillStyle=col;
-      ctx.beginPath();ctx.arc(xd,y,rOther,0,Math.PI*2);ctx.fill();
-      ctx.globalAlpha=1;
-      ctx.fillStyle='#fff';ctx.font=fntOther;
+      ctx.beginPath();ctx.arc(xd,y,r,0,Math.PI*2);ctx.fill();
+      ctx.globalAlpha=inWin?1:0.5;
+      ctx.fillStyle='#fff';ctx.font=fnt;
       ctx.textAlign='center';ctx.fillText(note,xd,y+2);
+      ctx.globalAlpha=1;
     }
   }
 
@@ -2203,25 +2314,30 @@ function draw(){
     const[fret,note]=posMap[si];
     const dotCol=noteRole(note,state.rootNote,state.ctype);
     const isRoot=dotCol==='#FF3300',isThird=dotCol==='#22CC44',isFifth=dotCol==='#3399FF';
+    const fAbs=(fret===0)?0:fret+(isB5&&si===0?Math.max(0,shortFret-capo):0);
+    const inWin=(fret===0)||(fAbs>=posMin&&fAbs<=posMax);
+    const rd_base=inWin?rPlay:rSmall;
+    const fnt_use=inWin?fntPlay:fntSmall;
 
     if(fret===0&&!isShort){
-      // Corde à vide jouée : pastille dans le cercle ouvert
       const x2=openXf;
       ctx.fillStyle=dotCol;
-      ctx.beginPath();ctx.arc(x2,y,openR,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.arc(x2,y,rd_base,0,Math.PI*2);ctx.fill();
       ctx.fillStyle='#fff';ctx.font=fntPlay;
       ctx.textAlign='center';ctx.fillText(note,x2,y+2);
     } else if(fret+voffM<=nFrets){
       const xd=fret===0?sx(voffM):sx(fret+voffM-0.5);
-      const rd=rPlay*(isRoot?1.18:isThird?1.05:1);
-      ctx.shadowColor=dotCol;ctx.shadowBlur=isRoot?12:6;
+      const rd=rd_base*(isRoot?1.18:isThird?1.05:1);
+      ctx.shadowColor=dotCol;ctx.shadowBlur=inWin?(isRoot?12:6):0;
       ctx.fillStyle=dotCol;
       ctx.beginPath();ctx.arc(xd,y,rd,0,Math.PI*2);ctx.fill();
       ctx.shadowBlur=0;
-      const ring=isRoot?'#fff':isThird?'#ffee99':isFifth?'#aaccff':'#ffffffaa';
-      ctx.strokeStyle=ring;ctx.lineWidth=isRoot?2.5:1.5;
-      ctx.beginPath();ctx.arc(xd,y,rd,0,Math.PI*2);ctx.stroke();
-      ctx.fillStyle='#fff';ctx.font=fntPlay;
+      if(inWin){
+        const ring=isRoot?'#fff':isThird?'#ffee99':isFifth?'#aaccff':'#ffffffaa';
+        ctx.strokeStyle=ring;ctx.lineWidth=isRoot?2.5:1.5;
+        ctx.beginPath();ctx.arc(xd,y,rd,0,Math.PI*2);ctx.stroke();
+      }
+      ctx.fillStyle='#fff';ctx.font=fnt_use;
       ctx.textAlign='center';ctx.fillText(note,xd,y+2);
     }
   }
@@ -2271,7 +2387,7 @@ function applyBarre(){
 }
 
 // ── GAMME / MODE GENERIC DRAW ──
-function drawFretboardGeneric(id,title,intervals,rootNote){
+function drawFretboardGeneric(id,title,intervals,rootNote,which='scale'){
   const _wg=document.getElementById(id.replace('cv-','wrap-'));
   if(_wg.classList.contains('hidden')||_wg.closest('.hidden')||_wg.style.display==='none')return;
   const{cv,ctx,W,H}=setupCanvas(id);
@@ -2297,83 +2413,97 @@ function drawFretboardGeneric(id,title,intervals,rootNote){
   const noteSet={};
   intervals.forEach((iv,idx)=>noteSet[(rootI+iv)%12]=idx);
 
+  // Zone de mise en valeur indépendante par section
+  const zStart=state[which+'Start']??-1;
+  const zEnd=state[which+'End']??((nFrets)+1);
+
+  // Tailles : grande dans la zone, petite hors zone
+  // rBig = taille des notes jouées dans l'accord (référence)
+  const rBig=Math.min(Math.max(fw*0.44,9),sg*0.44,22);
+  const rSmall=Math.max(4,Math.round(rBig*0.45));
+  const fntBig=`bold ${Math.max(9,Math.round(rBig*0.72))}px JetBrains Mono,monospace`;
+  const fntSmall=`bold ${Math.max(7,Math.round(rSmall*0.82))}px JetBrains Mono,monospace`;
+
+  const xOpen=ML-Math.round(ML*0.28);  // position cercle à vide dans la marge
+
   drawFretboardBase(ctx,W,H,g,null,capo);
 
   const lbl=`${rootNote} — ${title}${capo>0?`  [Capo ${capo}]`:''}`;
-  const gtSz=g.small?'bold 10px':'bold 13px';
-  const gsSz=g.small?'bold 9px':'bold 12px';
-  ctx.fillStyle='#00d4ff';ctx.font=`${gtSz} Space Grotesk,sans-serif`;
-  ctx.textAlign='center';ctx.fillText(lbl,W/2,g.small?11:16);
-  ctx.fillStyle='#ffffff';ctx.font=`${gsSz} Space Grotesk,sans-serif`;
-  ctx.textAlign='center';ctx.fillText(state.instrument,W/2,g.small?21:30);
+  ctx.fillStyle='#00d4ff';ctx.font='bold 13px Space Grotesk,sans-serif';
+  ctx.textAlign='center';ctx.fillText(lbl,W/2,16);
+  ctx.fillStyle='#ffffff';ctx.font='bold 11px Space Grotesk,sans-serif';
+  ctx.textAlign='center';ctx.fillText(state.instrument,W/2,30);
 
   const thicknesses=STR_THICK[state.instrument]||tuning.map((_,si)=>Math.max(1,3-si*0.4));
   drawStrings(ctx,g,tuning,dbl,thicknesses);
 
-  const rDot=Math.min(Math.max(fw*0.35,g.small?4:6),sg*0.38,g.small?10:16);
-  const dotFnt=g.small?'5px JetBrains Mono,monospace':'6px JetBrains Mono,monospace';
-  const dotFntB=g.small?'bold 5px JetBrains Mono,monospace':'bold 6px JetBrains Mono,monospace';
-  const r2=rDot*0.7;
-  const xOpen=ML-54;  // ajusté pour ML=100
+  const isB5g=isBanjo5();
+  const sfG=isB5g?shortStringFret():0;
+  const tuningMidi=tuning.map((t,si)=>(isB5g&&si===0)?noteToMidi(t):noteToMidi(t)+capo);
 
-  const isB5generic=isBanjo5();
-  const sfGeneric=isB5generic?shortStringFret():0;
-  // Corde courte : le capo ne l'affecte que si capo >= sfGeneric
-  const tuningMidi=tuning.map((t,si)=>(isB5generic&&si===0)?noteToMidi(t):noteToMidi(t)+capo);
   for(let si=0;si<nStr;si++){
     const y=sy(si);
-    const isShortStr=isB5generic&&si===0;
-    const voffG=isShortStr?Math.max(0,sfGeneric-capo):0;
-    // Note réelle corde courte : tient compte si capo dépasse l'accroche
+    const isShortStr=isB5g&&si===0;
+    const voffG=isShortStr?Math.max(0,sfG-capo):0;
     const openNI=tuningMidi[si]%12;
-    // Note à vide : dans la marge (cordes normales) ou sur l'accroche (corde courte banjo 5c)
+
+    // Note à vide
     if(openNI in noteSet){
       const deg=noteSet[openNI];
       const col=scaleColor(deg,openNI,rootI);
       const isRoot=(openNI===rootI);
-      const isWhite=(col==='#ffffff');
+      const inZone=(zStart<=-1||(zStart<0));  // à vide = frette 0, dans zone si zStart<=-1
+      const r=inZone?rBig:rSmall;
+      const fnt=inZone?fntBig:fntSmall;
       const xOp=isShortStr?sx(voffG):xOpen;
+      ctx.globalAlpha=inZone?1:0.45;
       ctx.fillStyle=col;
-      ctx.beginPath();ctx.arc(xOp,y,r2,0,Math.PI*2);ctx.fill();
-      ctx.strokeStyle=isRoot?'#fff':isWhite?'#888':'#222';ctx.lineWidth=1;
-      ctx.beginPath();ctx.arc(xOp,y,r2,0,Math.PI*2);ctx.stroke();
-      const noteLbl=NOTES[openNI];
-      ctx.fillStyle=isWhite?'#000':isRoot?'#fff':'#000';
-      ctx.font=dotFntB;
-      ctx.textAlign='center';ctx.fillText(noteLbl,xOp,y+2);
+      ctx.beginPath();ctx.arc(xOp,y,r,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle=(col==='#ffffff')?'#888':'#222';ctx.lineWidth=1;
+      ctx.beginPath();ctx.arc(xOp,y,r,0,Math.PI*2);ctx.stroke();
+      ctx.fillStyle=(col==='#ffffff')?'#000':isRoot?'#fff':'#000';
+      ctx.font=fnt;ctx.textAlign='center';ctx.fillText(NOTES[openNI],xOp,y+2);
+      ctx.globalAlpha=1;
     } else if(!isShortStr){
-      ctx.strokeStyle='#555';ctx.lineWidth=1;
-      ctx.beginPath();ctx.moveTo(xOpen-r2,y-r2);ctx.lineTo(xOpen+r2,y+r2);ctx.stroke();
-      ctx.beginPath();ctx.moveTo(xOpen-r2,y+r2);ctx.lineTo(xOpen+r2,y-r2);ctx.stroke();
+      // Croix à vide hors gamme
+      ctx.strokeStyle='#444';ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(xOpen-4,y-4);ctx.lineTo(xOpen+4,y+4);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(xOpen-4,y+4);ctx.lineTo(xOpen+4,y-4);ctx.stroke();
     }
-    // Frettes 1+ : fret musical → position visuelle = sx(f + voffG - 0.5)
+
+    // Frettes
     for(let f=1;f<=nFrets-voffG;f++){
       const ni=(tuningMidi[si]+f)%12;
       if(!(ni in noteSet))continue;
+      const fretAbs=f+voffG; // frette absolue sur le manche (pour comparaison avec zStart/zEnd)
+      const inZone=(fretAbs>zStart&&fretAbs<zEnd);
       const deg=noteSet[ni];
       const col=scaleColor(deg,ni,rootI);
       const isRoot=(ni===rootI);
-      const isWhite=(col==='#ffffff');
+      const r=inZone?rBig:rSmall;
+      const fnt=inZone?fntBig:fntSmall;
       const xd=sx(f+voffG-0.5);
+      ctx.globalAlpha=inZone?1:0.45;
       ctx.fillStyle=col;
-      ctx.beginPath();ctx.arc(xd,y,rDot,0,Math.PI*2);ctx.fill();
-      ctx.strokeStyle=isRoot?'#fff':isWhite?'#888':'#222';ctx.lineWidth=1;
-      ctx.beginPath();ctx.arc(xd,y,rDot,0,Math.PI*2);ctx.stroke();
-      const noteLbl=NOTES[ni];
-      ctx.fillStyle=isWhite?'#000':isRoot?'#fff':'#000';
-      ctx.font=dotFntB;
-      ctx.textAlign='center';ctx.fillText(noteLbl,xd,y+2);
+      ctx.beginPath();ctx.arc(xd,y,r,0,Math.PI*2);ctx.fill();
+      if(isRoot){ctx.shadowColor=col;ctx.shadowBlur=8;}
+      ctx.strokeStyle=isRoot?'#fff':(col==='#ffffff')?'#888':'#222';ctx.lineWidth=isRoot?2:1;
+      ctx.beginPath();ctx.arc(xd,y,r,0,Math.PI*2);ctx.stroke();
+      ctx.shadowBlur=0;
+      ctx.fillStyle=(col==='#ffffff')?'#000':isRoot?'#fff':'#000';
+      ctx.font=fnt;ctx.textAlign='center';ctx.fillText(NOTES[ni],xd,y+2);
+      ctx.globalAlpha=1;
     }
   }
 }
 
 function drawScale(){
   const intervals=state.scale?SCALES[state.scale]:null;
-  drawFretboardGeneric('cv-gamme',state.scale||'gamme',intervals,state.rootNote);
+  drawFretboardGeneric('cv-gamme',state.scale||'gamme',intervals,state.rootNote,'scale');
 }
 function drawMode(){
   const intervals=state.mode?MODES[state.mode]:null;
-  drawFretboardGeneric('cv-mode',state.mode||'mode',intervals,state.rootNote);
+  drawFretboardGeneric('cv-mode',state.mode||'mode',intervals,state.rootNote,'mode');
 }
 
 // ══════════════════════════════════════════════════════════════════
